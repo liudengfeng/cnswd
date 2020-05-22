@@ -1,0 +1,41 @@
+英文名称 	中文名称 	类型 	说明
+SECCODE	股票代码	VARCHAR	
+SECNAME	股票简称	VARCHAR
+INDID	行业ID	VARCHAR	
+INDNAME	行业名称	VARCHAR	
+F001V	行业级别	VARCHAR	
+F002V	级别说明	VARCHAR	
+F003D	报告期	DATE	
+F004N	每股收益	DECIMAL(14,6)	单位：元
+F005N	每股收益_行业均值	DECIMAL(14,6)
+F006N	每股收益_行业排名	INT
+F007N	扣除后每股收益	DECIMAL(14,6)	单位：元
+F008N	扣除后每股收益_行业均值	DECIMAL(14,6)
+F009N	扣除后每股收益_行业排名	INT
+F010N	每股净资产	DECIMAL(14,6)	单位：元
+F011N	每股净资产_行业均值	DECIMAL(14,6)
+F012N	每股净资产_行业排名	INT
+F013N	净资产收益率	DECIMAL(14,6)	单位：元
+F014N	净资产收益率_行业均值	DECIMAL(14,6)
+F015N	净资产收益率_行业排名	INT
+F016N	每股未分配利润	DECIMAL(14,6)	单位：元
+F017N	每股未分配利润_行业均值	DECIMAL(14,6)
+F018N	每股未分配利润_行业排名	INT
+F019N	每股经营现金流量	DECIMAL(14,8)	单位：元
+F020N	每股经营现金流量_行业均值	DECIMAL(14,6)
+F021N	每股经营现金流量_行业排名	INT
+F022N	营业收入增长率	DECIMAL(14,8)	单位：元
+F023N	营业收入增长率_行业均值	DECIMAL(14,6)
+F024N	营业收入增长率_行业排名	INT
+F025N	净利润增长率	DECIMAL(14,8)	单位：元
+F026N	净利润增长率_行业均值	DECIMAL(14,6)
+F027N	净利润增长率_行业排名	INT
+F028N	毛利率	DECIMAL(14,8)	单位：元
+F029N	毛利率_行业均值	DECIMAL(14,6)
+F030N	毛利率_行业排名	INT
+F031N	资产负债率	DECIMAL(14,8)	单位：元
+F032N	资产负债率_行业均值	DECIMAL(14,6)
+F033N	资产负债率_行业排名	INT
+F034N	应收帐款周转率	DECIMAL(14,8)	单位：元
+F035N	应收帐款周转率_行业均值	DECIMAL(14,6)
+F036N	应收帐款周转率_行业排名	INT

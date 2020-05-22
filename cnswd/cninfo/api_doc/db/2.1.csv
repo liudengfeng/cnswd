@@ -1,0 +1,16 @@
+英文名称 	中文名称 	类型 	说明
+SECCODE	股票代码	varchar	
+SECNAME	股票简称	varchar	
+ENDDATE	变动日期	date	
+DECLAREDATE	公告日期	date	
+F001V	直接持有人ID	varchar	
+F002V	直接持有人名称	varchar	
+F003V	实际控制人ID	varchar	
+F004V	实际控制人名称	varchar	
+F005N	控股数量(万股)	decimal	
+F006N	控股比例	decimal	
+F007V	控制类型编码	varchar	
+F008V	控制类型	varchar	包括：家族控制、单独控制、一致行动人；选择时程序自动同时将名称填入
+F012V	直接控制人ID	varchar	
+F013V	直接控制人名称	varchar	实际控制人可能直接或间接控制该上市公司。当实际控制人直接控制该上市公司时，实际控制人的下一层级单位仍为实际控制人本身，当实际控制人间接通过其他公司持有该上市公司股票时，实际控制人的下一层级单位为实际控制人直接持股的公司名称。当同时存在直接或间接持股该上市公司时，每条关系链上的下一层级均要列出。
+F014V	实际控制人类型	varchar	自然人、国有、集体、国企、外企

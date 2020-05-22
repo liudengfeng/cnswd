@@ -1,0 +1,14 @@
+英文名称 	中文名称 	类型 	说明
+SECCODE	股票代码	varchar	
+SECNAME	股票简称	varchar	
+DECLAREDATE	公告日期	DATE	
+F001D	报告年度	DATE	YYYY-03-31为一季度，YYYY-06-30为中报，YYYY-09-30为三季报，YYYY-12-31为年报
+F002V	业绩类型编码	varchar	通过公共编码表选择采集，对应的总类编码为035
+F003V	业绩类型	varchar	包括：业绩小幅增长（50%以下）；业绩大幅增长（50%以上）；业绩预盈；业绩小幅下降（50%以下）；业绩大幅下降（50%以上）；业绩预亏；业绩持平；不确定；选择时程序自动将名称同时填入
+F004V	业绩预告内容	varchar	
+F005V	业绩变化原因	varchar	
+F006C	报告期最新记录标识	char(1)	
+F007N	本期净利润下限	decimal	
+F008N	本期净利润上限	decimal	
+F009N	本期净利润增减幅下限	decimal	
+F010N	本期净利润增减幅上限	decimal

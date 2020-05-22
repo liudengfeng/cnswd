@@ -1,0 +1,14 @@
+英文名称 	中文名称 	类型 	说明
+SECCODE	股票代码	varchar	
+SECNAME	股票简称	varchar	
+DECLAREDATE	公告日期	date	
+varydate	增减持截止日	date	变动截止日期
+F001C	增减持类型	char	B--增持;S--减持
+F002V	股东名称	varchar	
+F003V	股东ID	varchar	
+F004N	变动数量	bigint	单位：股
+F005N	变动数量占总股本比例	decimal	单位：%;
+F006N	变动后占比	decimal	单位：%
+F007V	增减持价格上限	varchar	
+F013N	变动后持股数量	bigint	单位：股
+F014N	变动后持有流通股数量	bigint	单位：股

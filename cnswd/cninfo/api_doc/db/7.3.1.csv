@@ -1,0 +1,53 @@
+英文名称 	中文名称 	类型 	说明
+SECCODE	股票代码	varchar	
+SECNAME	股票简称	varchar	
+STARTDATE	开始日期	date	
+ENDDATE	截止日期	date	
+F001D	报告年度	date	
+F002V	合并类型编码	varchar	
+F003V	合并类型	varchar	
+F006N	其中：营业收入	decimal	单位：元
+F007N	其中：营业成本	decimal	单位：元
+F008N	营业税金及附加	decimal	单位：元
+F009N	销售费用	decimal	单位：元
+F010N	管理费用	decimal	单位：元
+F011N	堪探费用	decimal	单位：元
+F012N	财务费用	decimal	单位：元
+F013N	资产减值损失	decimal	单位：元
+F014N	加：公允价值变动净收益	decimal	单位：元
+F015N	投资收益	decimal	单位：元
+F016N	其中：对联营企业和合营企业的投资收益	decimal	单位：元
+F017N	影响营业利润的其他科目	decimal	单位：元
+F018N	三、营业利润	decimal	单位：元
+F019N	加：补贴收入	decimal	单位：元
+F020N	营业外收入	decimal	单位：元
+F021N	减：营业外支出	decimal	单位：元
+F022N	其中：非流动资产处置损失	decimal	单位：元
+F023N	加：影响利润总额的其他科目	decimal	单位：元
+F024N	四、利润总额	decimal	单位：元
+F025N	减：所得税	decimal	单位：元
+F026N	加：影响净利润的其他科目	decimal	单位：元
+F027N	五、净利润	decimal	单位：元
+F028N	归属于母公司所有者的净利润	decimal(18,2)	单位：元
+F029N	少数股东损益	decimal(18,2)	单位：元
+F030N	六、每股收益：	decimal(18,2)
+F031N	（一）基本每股收益	decimal(18,2)	
+F033N	利息收入	decimal	单位：元
+F034N	已赚保费	decimal	单位：元
+F035N	一、营业总收入	decimal	单位：元
+F036N	二、营业总成本	decimal	单位：元
+F037N	汇兑收益	decimal	单位：元
+F038N	七、其他综合收益	decimal(18,2)	单位：元
+F039N	八、综合收益总额	decimal(18,2)	单位：元
+F040N	其中：归属于母公司	decimal	单位：元
+F041N	其中：归属于少数股东	decimal	单位：元
+F042N	手续费及佣金收入	decimal	单位：元
+F043N	利息支出	decimal	单位：元
+F044N	手续费及佣金支出	decimal	单位：元
+F045N	退保金	decimal	单位：元
+F046N	赔付支出净额	decimal	单位：元
+F047N	提取保险合同准备金净额	decimal	单位：元
+F048N	保单红利支出	decimal	单位：元
+F049N	分保费用	decimal	单位：元
+F050N	其中：非流动资产处置利得	decimal	单位：元
+F051N	其他收益	DECIMAL(18,2)	

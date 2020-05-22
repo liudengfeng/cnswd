@@ -1,0 +1,42 @@
+英文名称 	中文名称 	类型 	说明
+SECCODE	股票代码	varchar	
+SECNAME	股票简称	varchar	
+F001D	分红年度	date	
+F002D	董事会预案公告日期	date	
+F003V	董事会预案分红说明	varchar	每10股送XX转增XX派XX元或不分配不转赠
+F004D	股东大会预案公告日期	date	
+F005V	股东大会预案分红说明	varchar	每10股送XX转增XX派XX元或不分配不转赠
+F006D	实施方案公告日期	date	
+F007V	实施方案分红说明	varchar	每10股送XX转增XX派XX元
+F008N	分配股本基数（实施）	decimal	单位：万股
+F009D	股本基准年度	date	
+F010N	送股比例	decimal	单位:每10股送XX股
+F011N	转增比例	decimal	单位：每10股转增XX股
+F012N	派息比例(人民币)	decimal	单位：每10股派XX元
+F013N	派息比例（美元）	decimal	单位：每10股派XX元
+F014N	派息比例（港币）	decimal	单位：每10股派XX元
+F015N	送股数量	decimal	单位：万股
+F016N	转增数量	decimal	单位：万股
+F017N	派息金额(人民币)	decimal	单位：万元
+F018D	A股股权登记日	date	
+F019D	B股股权登记日	date	
+F020D	A股除权日	date	
+F021D	B股除权基准日	date	
+F022D	B股最后交易日	date	
+F023D	派息日(A)	date	
+F024D	派息日(B)	date	
+F025D	A股送红股到帐日	date	
+F026D	A股新增股份上市日	date	
+F027D	B股新增股份上市日	date	
+F028N	送转前总股本	decimal	单位：万股
+F029N	送转后总股本	decimal	单位：万股
+F030N	送转前流通股本	decimal	单位：万股
+F031N	送转后流通股本	decimal	单位：万股
+F033N	分配股本基数（董）	decimal	单位：万股
+F034N	分配股本基数（股）	decimal	单位：万股
+F036V	方案进度	varchar	
+F037D	取消分红公告日期	date	
+F038D	A股转赠股份到帐日	date	
+F039D	B股转赠股份到帐日	date	
+F040D	B股送红股到帐日	date	
+F041N	汇率	decimal

@@ -1,0 +1,13 @@
+英文名称 	中文名称 	类型 	说明
+SECCODE	股票代码	VARCHAR	
+SECNAME	股票简称	VARCHAR	
+DECLAREDATE	发布日期	DATE	
+F002V	研究机构简称	VARCHAR	
+F003V	研究员名称	VARCHAR	
+F004V	投资评级	VARCHAR	
+F005V	投资评级（经调整）	VARCHAR
+F006V	是否首次评级	VARCHAR	
+F007V	评级变化	VARCHAR
+F008V	前一次投资评级	VARCHAR	
+F009N	目标价格（下限）	DECIMAL
+F010N	目标价格（上限）	DECIMAL
