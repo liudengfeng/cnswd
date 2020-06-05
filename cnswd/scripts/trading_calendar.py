@@ -5,6 +5,10 @@ trading_date
 1. 所有交易日历
 2. 最新交易的股票代码列表
 
+bug：网易指数数据并不能确保及时更新
+解决方案：
+    存储最近的交易日合并
+
 工作日每天 9：31分执行
 """
 import re
@@ -60,32 +64,50 @@ def add_info(dates):
     TradingDateStore.create_table_index(None)
 
 
-def handle_today():
+def hist_tdates():
+    """最近一个月的数据"""
     today = pd.Timestamp.today()
     codes = get_all_stock_codes()
     shuffle(codes)
     codes = codes[:10]
-    if _is_today_trading(codes):
-        return today.normalize()
+    is_trading = _is_today_trading(codes)
+    fp = data_root('last_month_tdates.pkl')
+    if not fp.exists():
+        # 日期按降序排列
+        tdates = [
+            d for d in fetch_history('000001', None, None, True).index[:25]
+        ]
+        if is_trading:
+            tdates.append(today.normalize())
+        tdates = list(set(tdates))
+        tdates = sorted(tdates)
+        s = pd.Series(tdates)
+        s.to_pickle(str(fp))
     else:
-        return None
+        # 始终保存最近最近一个月的数据
+        tdates = [d for d in pd.read_pickle(str(fp))][-24:]
+        if is_trading:
+            tdates.append(today.normalize())
+        tdates = list(set(tdates))
+        tdates = sorted(tdates)
+        s = pd.Series(tdates)
+        s.to_pickle(str(fp))
+    return [d for d in pd.read_pickle(str(fp))]
 
 
 def refresh_trading_calendar():
     """刷新交易日历"""
-    today = pd.Timestamp.today()
-    yesterday = today - pd.Timedelta(days=1)
-    dts = pd.date_range(MARKET_START.tz_localize(None), yesterday, freq='B')
-    # 数据可能并不完整
+    # 取决于提取时间，如网络尚未提供最新的数据，可能不包含当日甚至最近日期的数据
+    # 最初日期为 1990-12-19
     history = fetch_history('000001', None, None, True)
-    dates = []
-    for d in dts:
-        if d in history.index:
-            dates.append(d)
-    today = handle_today()
-    if today:
-        dates.append(today)
-    add_info(dates)
+    tdates = []
+    for d in history.index:
+        tdates.append(d)
+    last_month_tdates = hist_tdates()
+    tdates.extend(last_month_tdates)
+    tdates = list(set(tdates))
+    tdates = sorted(tdates)
+    add_info(tdates)
     print('done')
 
 
