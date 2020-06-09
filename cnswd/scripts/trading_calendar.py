@@ -46,6 +46,7 @@ def _add_prefix(stock_code):
 
 
 def _is_today_trading(codes):
+    """只有实际成交后才会体现当天为交易日"""
     today = pd.Timestamp.today()
     url_fmt = 'http://hq.sinajs.cn/list={}'
     url = url_fmt.format(','.join(map(_add_prefix, codes)))

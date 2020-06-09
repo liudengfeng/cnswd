@@ -80,6 +80,7 @@ async def refresh():
     today = pd.Timestamp('today')
     # 后台计划任务控制运行时间点。此处仅仅判断当天是否为交易日
     if not is_trading_day(today):
+        logger.notice(f"{today} 非交易日")
         return
     df = await fetch_all()
     if len(df) > 0:
