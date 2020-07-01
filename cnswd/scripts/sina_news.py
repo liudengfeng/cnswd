@@ -53,9 +53,10 @@ def refresh(pages):
     df = retry_call(fecth_news, [pages], tries=3)
     df = ensure_dtypes(df, **col_dtypes)
     df = df.loc[df['序号'] > id_, :]
-    data = to_dict(df)
-    collection.insert_many(data)
-    logger.info(f"插入 {df.shape[0]} 行")
+    if len(data):
+        data = to_dict(df)
+        collection.insert_many(data)
+        logger.info(f"插入 {df.shape[0]} 行")
 
 
 def create_index(collection):

@@ -1,3 +1,4 @@
+yahooquery>=2.2.4
 beautifulsoup4>=4.6.3
 bs4>=0.0.1
 Click>=7.0
@@ -25,4 +26,3 @@ retry>=0.9.2
 log4mongo>=1.7.0
 # fix _ssl.c:1059: The handshake operation timed out
 # requests[security]
-yahooquery>=2.2.4
