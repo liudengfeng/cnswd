@@ -16,7 +16,7 @@ import click
 import pandas as pd
 
 from ..cninfo import ASR_KEYS
-from ..utils import before_refresh, kill_firefox, remove_temp_files
+from ..utils import kill_firefox, remove_temp_files
 from . import (cninfo, cninfo_meta, classify, disclosure, sina_news, yahoo,
                sina_quote, tct_gn, tct_minutely, ths_gn, ths_news, wy_cjmx,
                wy_index, wy_stock, trading_calendar, trading_codes, treasury)
