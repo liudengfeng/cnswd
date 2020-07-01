@@ -1,24 +1,20 @@
-import logbook
-from logbook.more import ColorizedStderrHandler, StderrHandler
-
-from ..setting.config import LOG_TO_FILE
-from .path_utils import data_root
-
-# 设置显示日志
-logbook.set_datetime_format('local')
+import logging
+from log4mongo.handlers import MongoHandler
 
 
-def make_logger(name, to_file=None):
-    """生成logger对象"""
-    logger = logbook.Logger(name)
-    if to_file is None:
-        to_file = LOG_TO_FILE
-    if to_file:
-        fp = data_root('log')
-        fn = fp / f"{name}.txt"
-        logger.handlers.append(logbook.FileHandler(fn))
-    # 使用coloram经常导致递归错误
-    # handler = ColorizedStderrHandler()
-    handler = StderrHandler()
-    handler.push_application()
+def make_logger(name, collection='cnswd', level=logging.NOTSET):
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(name)s %(message)s')
+    logger = logging.Logger(name)
+    logger.addHandler(
+        MongoHandler(level=level,
+                     host='localhost',
+                     database_name='eventlog',
+                     collection=collection if collection else name,
+                     fail_silently=False,
+                     capped_max=10000,
+                     capped=True))
+    ch = logging.StreamHandler()
+    ch.setLevel(level)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
     return logger

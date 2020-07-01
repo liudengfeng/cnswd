@@ -1,4 +1,6 @@
 """
+废弃
+
 新浪网设置了访问频次限制。
 
 新浪有许多以列表形式提供的汇总列，每天访问也仅仅一次。
@@ -17,11 +19,11 @@ import requests
 from bs4 import BeautifulSoup
 import logbook
 
-from cnswd.constants import QUOTE_COLS
+from ..setting.constants import QUOTE_COLS
 from cnswd.utils import ensure_list
-from cnswd.data_proxy import DataProxy
+# from cnswd.data_proxy import DataProxy
 from cnswd.websource.base import friendly_download, get_page_response
-from cnswd.websource.exceptions import NoWebData, FrequentAccess
+from .._exceptions import NoWebData, FrequentAccess
 
 QUOTE_PATTERN = re.compile('"(.*)"')
 NEWS_PATTERN = re.compile(r'\W+')

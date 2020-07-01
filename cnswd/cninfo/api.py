@@ -1,7 +1,4 @@
-# from io import BytesIO
 # from urllib import parse
-
-# import pandas as pd
 # import requests
 
 # from cnswd.cninfo.pw import PW
@@ -35,7 +32,7 @@
 # data = {
 #     'platetype': 137008,
 #     'access_token': token,
-#     # 'format': 'csv'
+#     # 'format': 'json'
 # }
 
 # url = "http://webapi.cninfo.com.cn/api/stock/p_public0004"
@@ -48,4 +45,3 @@
 
 # r.encoding = 'utf8'
 
-# pd.read_csv(r.content)

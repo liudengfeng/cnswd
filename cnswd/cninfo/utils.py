@@ -1,77 +1,54 @@
 import pandas as pd
-from collections import OrderedDict
-from os import path
+from functools import partial
 import re
 
-NUM_PAT = re.compile(r'\d{1,}')
-here = path.abspath(path.dirname(__file__))
+NUM_PAT = re.compile(r"([(]\d{1,}(,\d{1,})?[)])")
 
 
-def get_field_map(item, level, to_dict=True):
-    """获取字段信息
-    
-    Arguments:
-        item {str} -- 项目名称 db, ts
-        level {str} -- 项目层级
-    
-    Keyword Arguments:
-        to_dict {bool} -- 是否以字典形式输出 (default: {True})
-    
+def _rename(old):
+    if old == '证券代码':
+        return '股票代码'
+    if old == '证券简称':
+        return '股票简称'
+    new = old.replace('Ａ', 'A')
+    new = new.replace('Ｂ', 'B')
+    new = new.replace('Ｈ', 'H')
+    return new
+
+
+def _convert_func(field_type):
+    type_ = NUM_PAT.sub('', field_type)
+    type_ = type_.upper()
+    if type_ in ('VARCHAR', 'CHAR'):
+        return lambda x: x
+    elif type_ in ('DATE', 'DATETIME'):
+        return partial(pd.to_datetime, errors='coerce')
+    elif type_ in ('BIGINT', 'INT'):
+        return int
+    elif type_ in ('DECIMAL', 'NUMERIC'):
+        return lambda x: x
+    raise ValueError(f"未定义类型'{type_}'")
+
+
+def cleaned_data(data, field_maps):
+    """清理后的数据
+
+    Args:
+        data (list): 字典列表
+        field_maps (list): 字段元数据列表
+
     Returns:
-        {dict or DataFrame} -- 项目字段信息
+        list: 整理后的数据
     """
-    fp = path.join(here, 'api_doc', item, f"{level}.csv")
-    df = pd.read_csv(fp, '\t')
-    df.columns = df.columns.str.strip()
-    if to_dict:
-        return OrderedDict(
-            {row['英文名称']: row['中文名称']
-             for _, row in df.iterrows()})
-    else:
-        return df
-
-
-def get_field_type(item, level):
-    """获取列类型"""
-    fp = path.join(here, 'api_doc', item, f"{level}.csv")
-    df = pd.read_csv(fp, '\t', dtype={'类型': str})
-    df.columns = df.columns.str.strip()
-    d_cols, s_cols, i_cols, f_cols = [], [], [], []
-    for _, row in df.iterrows():
-        type_ = row['类型'][:3].lower()
-        if type_ in ('dat', ):
-            d_cols.append(row['中文名称'])
-        elif type_ in ('var', 'char'):
-            s_cols.append(row['中文名称'])
-        elif type_ in ('big', 'int'):
-            i_cols.append(row['中文名称'])
-        elif type_ in ('dec', 'num'):
-            f_cols.append(row['中文名称'])
-    return {
-        'd_cols': d_cols,
-        's_cols': s_cols,
-        'i_cols': i_cols,
-        'f_cols': f_cols,
+    name_maps = {
+        d['fieldName']: _rename(d['fieldChineseName'])
+        for d in field_maps
     }
-
-
-def get_min_itemsize(item, level):
-    """获取字符类列最小长度"""
-    assert level in ('1', )
-    fp = path.join(here, 'api_doc', item, f"{level}.csv")
-    df = pd.read_csv(fp, '\t', dtype={'类型': str})
-    df.columns = df.columns.str.strip()    
-    ret = {}
-    for _, row in df.iterrows():
-        name = row['中文名称']
-        type_ = row['类型'][:3].lower()
-        if name == '股票代码':
-            ret[name] = 6
-            continue
-        if name == '股票简称':
-            ret[name] = 20
-            continue
-        if type_ in ('var', 'char'):
-            len_ = re.findall(NUM_PAT, row['类型'])[0]
-            ret[name] = int(len_)
-    return ret
+    convert_maps = {
+        d['fieldName']: _convert_func(d['fieldType'])
+        for d in field_maps
+    }
+    return [{
+        name_maps.get(k, k): convert_maps.get(k, lambda x: x)(v)
+        for k, v in row.items() if v
+    } for row in data]

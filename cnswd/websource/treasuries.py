@@ -19,7 +19,7 @@ from pathlib import Path
 import pandas as pd
 
 from ..utils import data_root, sanitize_dates
-from .._selenium import make_headless_browser_with_auto_save_path
+from .._seleniumwire import make_headless_browser_with_auto_save_path
 
 EARLIEST_POSSIBLE_DATE = pd.Timestamp('2002-1-4', tz='UTC')
 

@@ -1,6 +1,6 @@
 """
 
-压缩数据
+TODO:废弃
 
 执行频率：
     月
@@ -22,17 +22,6 @@ from shutil import copy2, move
 import click
 import pandas as pd
 
-from cnswd.store import (DataBrowseStore, SinaQuotesStore, TctMinutelyStore,
-                         WyCjmxStore, WyStockDailyStore)
-
-classes = (
-    DataBrowseStore,
-    SinaQuotesStore,
-    WyCjmxStore,
-    TctMinutelyStore,
-    WyStockDailyStore,
-)
-
 warnings.filterwarnings('ignore')
 
 
@@ -40,9 +29,8 @@ def _cmd(in_p, out_p):
     in_f = in_p.as_posix().replace("C:", "")
     out_f = out_p.as_posix().replace("C:", "")
     return [
-        "ptrepack", "--chunkshape=auto", "--propindexes",
-        "--complevel=9", "--complib=blosc:blosclz",
-        in_f, out_f
+        "ptrepack", "--chunkshape=auto", "--propindexes", "--complevel=9",
+        "--complib=blosc:blosclz", in_f, out_f
     ]
 
 
@@ -67,7 +55,8 @@ def main():
     with click.progressbar(classes,
                            length=len(classes),
                            show_eta=True,
-                           item_show_func=lambda x: f"文件名:{x.__name__}" if x is not None else '完成',
+                           item_show_func=lambda x: f"文件名:{x.__name__}"
+                           if x is not None else '完成',
                            label="压缩数据") as pbar:
         for c in pbar:
             try:

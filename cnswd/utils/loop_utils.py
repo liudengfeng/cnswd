@@ -25,16 +25,18 @@ def loop_period_by(start, end, freq='B', exclude_future=True):
             s = start
         if e > end:
             e = end
-        res.append((s, e))
+        # 开始日期须小于等于结束日期
+        if s <= e:
+            res.append((s, e))
     return res
 
 
-def loop_codes(input_code, batch_num):
-    """分批循环代码"""
+def batch_loop(iterable, batch_num):
+    """分批循环项目"""
     res = []
-    codes = ensure_list(input_code)
-    total_num = len(codes)
+    items = ensure_list(iterable)
+    total_num = len(items)
     for start in range(0, total_num, batch_num):
         end = start + batch_num if start + batch_num < total_num else total_num
-        res.append(codes[start:end])
+        res.append(items[start:end])
     return res

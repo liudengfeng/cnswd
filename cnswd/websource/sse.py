@@ -26,7 +26,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
 from cnswd.utils import data_root, most_recent_path
-from cnswd.websource._selenium import make_headless_browser
+from cnswd.websource._seleniumwire import make_headless_browser
 
 
 logger = logbook.Logger('上交所')
@@ -44,7 +44,7 @@ class SSEPage(object):
 
     def __init__(self, download_path=data_root('download')):
         self.host_url = 'http://www.sse.com.cn'
-        logger.notice('初始化无头浏览器......')
+        logger.info('初始化无头浏览器......')
         self.driver = make_headless_browser()
         self.wait = WebDriverWait(self.driver, MAX_WAIT_SECOND)
 

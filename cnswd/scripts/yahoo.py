@@ -1,85 +1,93 @@
+"""
+使用 https://github.com/dpguthrie/yahooquery
+"""
 import os
-from multiprocessing import Pool
+import time
 
 import pandas as pd
-from tenacity import retry, retry_if_exception_type, stop_after_attempt
+from pymongo.errors import DuplicateKeyError
+from retry.api import retry_call
+from yahooquery import Ticker
 
+from ..mongodb import get_db
+from ..scripts.trading_codes import read_all_stock_codes
 from ..setting.constants import MAX_WORKER
-from ..utils import data_root, make_logger
-from ..websource.yahoo import (fetch_ebitda, fetch_free_cash_flow,
-                               fetch_history, fetch_total_assets)
+from ..utils import make_logger
+from ..utils.db_utils import to_dict
 
-from ..websource.tencent import get_recent_trading_stocks
+logger = make_logger('雅虎财经')
 
-
-def file_path(code, item):
-    return data_root(f"yahoo/{item}/{code}.pkl")
-
-
-def get_start(code, item):
-    fn_path = file_path(code, item)
-    if os.path.exists(fn_path):
-        # 最新修改时间
-        st_mtime = pd.Timestamp(os.stat(fn_path).st_mtime, unit='s')
-        # 如最新修改时间为当天，则返回`明天`
-        if st_mtime.date() == pd.Timestamp.today().date():
-            return pd.Timestamp.today().normalize() + pd.Timedelta(days=1)
-        last_date = pd.read_pickle(fn_path)['date'].values[-1]
-        return pd.Timestamp(last_date) + pd.Timedelta(days=1)
-    return pd.Timestamp('1991-01-01')
+ITEMS = [
+    # 'financialData',
+    'balanceSheetHistory',
+    'cashflowStatementHistory',
+    'incomeStatementHistory',
+    'incomeStatementHistoryQuarterly',
+    'cashflowStatementHistoryQuarterly',
+    'balanceSheetHistoryQuarterly',
+]
 
 
-@retry(retry=retry_if_exception_type(ValueError), stop=stop_after_attempt(3))
-def _one_stock(code):
-    today = pd.Timestamp.today().normalize()
-    if today.weekday() == 6:
-        today = today - pd.Timedelta(days=1)
-    elif today.weekday() == 0:
-        today = today - pd.Timedelta(days=2)
-    for func in (fetch_ebitda, fetch_free_cash_flow, fetch_history,
-                 fetch_total_assets):
-        name = func.__name__.replace('fetch_', '')
-        if name != 'history':
-            for period_type in ('quarterly', 'annual'):
-                item = f"{period_type}_{name}"
-                logger = make_logger(item)
-                start = get_start(code, item)
-                if start > today:
-                    info = f"{code} {start.strftime(r'%Y-%m-%d')} ~ {today.strftime(r'%Y-%m-%d')} 无数据"
-                    logger.info(info)
-                    continue
-                web_data = func(code, period_type=period_type)
-                fp = file_path(code, item)
-                if not os.path.exists(fp):
-                    web_data.to_pickle(fp)
-                    rows = len(web_data)
-                else:
-                    old_data = pd.read_pickle(fp)
-                    df = pd.concat([old_data, web_data],
-                                   sort=False).drop_duplicates(subset='date')
-                    df.to_pickle(fp)
-                    rows = len(df)
-                info = f"添加 {code} {start.strftime(r'%Y-%m-%d')} ~ {today.strftime(r'%Y-%m-%d')} {rows}行"
-                logger.info(info)
+def create_index(name):
+    db = get_db('yahoo')
+    coll = db[name]
+    if name not in db.list_collection_names():
+        dt_field = 'endDate'  #'asOfDate' if name.endswith('Quarterly') else 'endDate'
+        coll.create_index([("stockCode", 1)], name='code_index')
+        coll.create_index([(dt_field, -1)], name='dt_index')
+        coll.create_index([(dt_field, -1), ("stockCode", 1)],
+                          unique=True,
+                          name='id_index')
 
 
-def refresh_all():
-    stock_codes = get_recent_trading_stocks()
-    with Pool(MAX_WORKER) as pool:
-        pool.map(_one_stock, stock_codes)
+def to_yahoo_ticker(code):
+    if code[0] in ('0', '2', '3'):
+        return f"{code}.SZ"
+    else:
+        return f"{code}.SS"
 
 
-def read_data(code, item, period_type='quarterly'):
-    """读取本地项目数据
+def financial_data():
+    codes = read_all_stock_codes()
+    logger.info(f'提取数据 股票数量 {len(codes)}')
+    s = time.time()
+    codes = ' '.join(list(map(to_yahoo_ticker, codes)))
+    stock = Ticker(codes)
+    data = retry_call(stock.get_modules, [ITEMS], tries=3, delay=3)
+    duration = time.time() - s
+    logger.info(f'完成提取 耗时 {duration:.2f}秒')
+    return data
 
-    Arguments:
-        code {str} -- 股票代码
-        item {str} -- 项目名称
 
-    Keyword Arguments:
-        period_type {str} -- 周期类别 (default: {'quarterly'})
-    """
-    if item != 'history':
-        item = f"{period_type}_{item}"
-    fp = file_path(code, item)
-    return pd.read_pickle(fp)
+def parse(data):
+    for t, info in data.items():
+        code = t.split('.')[0]
+        for name, value in info.items():
+            value.pop('maxAge')
+            yield code, name, value
+
+
+def to_coll(data):
+    db = get_db('yahoo')
+    logger.info(f'刷新中......')
+    s = time.time()
+    for code, name, d in parse(data):
+        for _, docs in d.items():
+            create_index(name)
+            coll = db[name]
+            for doc in docs:
+                doc.pop('maxAge')
+                doc['stockCode'] = code
+                doc['endDate'] = pd.to_datetime(doc['endDate'],
+                                                errors='coerce')
+                try:
+                    coll.insert_one(doc)
+                    logger.info(f'插入股票{code}项目{name:>40} 1 行')
+                except DuplicateKeyError:
+                    pass
+    duration = time.time() - s
+    logger.info(f'更新 耗时 {duration:.2f}秒')
+
+
+def refresh():
+    to_coll(financial_data())

@@ -17,24 +17,15 @@ import pandas as pd
 import requests
 from numpy.random import shuffle
 
+from ..mongodb import get_db
 from ..setting.constants import MARKET_START
-from ..store import TradingDateStore, DataBrowseStore
-from ..utils import data_root, ensure_dt_localize
+from ..utils import data_root, ensure_dt_localize, make_logger
 from ..websource.tencent import get_recent_trading_stocks
 from ..websource.wy import fetch_history
+from .trading_codes import read_all_stock_codes
 
 DATE_PATTERN = re.compile(r'(\d{4}-\d{2}-\d{2})')
-
-
-def get_all_stock_codes():
-    try:
-        # 包含全部代码
-        df = DataBrowseStore.query('1')
-        codes = df['股票代码'].values.tolist()
-    except Exception:
-        # 近期交易的股票代码
-        codes = get_recent_trading_stocks()
-    return codes
+logger = make_logger("交易日历")
 
 
 def _add_prefix(stock_code):
@@ -55,66 +46,82 @@ def _is_today_trading(codes):
     return today.strftime(r"%Y-%m-%d") in dts
 
 
-def add_info(dates):
-    # 使用写模式覆盖原数据
-    df = pd.DataFrame({'trading_date': dates})
-    # 必须将`添加`参数设置为False，使用覆盖式!!!
-    TradingDateStore.append(df, kw={'append': False})
-    TradingDateStore.set_attr('codes', get_all_stock_codes())
-    # 非必要操作
-    TradingDateStore.create_table_index(None)
+def update(tdates, last_month):
+    db = get_db('stockdb')
+    collection = db['交易日历']
+    doc = {
+        'tdates': tdates,
+        "last_month": last_month,
+        "update_time": pd.Timestamp.now()
+    }
+    if collection.estimated_document_count() == 0:
+        collection.insert_one(doc)
+    else:
+        collection.find_one_and_replace({}, doc)
+
+
+def local_hist():
+    db = get_db('stockdb')
+    collection = db['交易日历']
+    try:
+        return collection.find_one()['last_month']
+    except TypeError:
+        return []
 
 
 def hist_tdates():
     """最近一个月的数据"""
     today = pd.Timestamp.today()
-    codes = get_all_stock_codes()
+    codes = read_all_stock_codes()
     shuffle(codes)
     codes = codes[:10]
     is_trading = _is_today_trading(codes)
-    fp = data_root('last_month_tdates.pkl')
-    if not fp.exists():
-        # 日期按降序排列
-        tdates = [
-            d for d in fetch_history('000001', None, None, True).index[:25]
-        ]
-        if is_trading:
-            tdates.append(today.normalize())
-        tdates = list(set(tdates))
-        tdates = sorted(tdates)
-        s = pd.Series(tdates)
-        s.to_pickle(str(fp))
-    else:
-        # 始终保存最近最近一个月的数据
-        tdates = [d for d in pd.read_pickle(str(fp))][-24:]
-        if is_trading:
-            tdates.append(today.normalize())
-        tdates = list(set(tdates))
-        tdates = sorted(tdates)
-        s = pd.Series(tdates)
-        s.to_pickle(str(fp))
-    return [d for d in pd.read_pickle(str(fp))]
+    # 日期按降序排列
+    tdates = [d for d in fetch_history('000001', None, None, True).index[:25]]
+    if is_trading:
+        tdates.append(today.normalize())
+    # 添加本地数据
+    tdates.extend([pd.Timestamp(d) for d in local_hist()])
+    return sorted(set(tdates))[-25:]
 
 
-def refresh_trading_calendar():
+def refresh():
     """刷新交易日历"""
     # 取决于提取时间，如网络尚未提供最新的数据，可能不包含当日甚至最近日期的数据
     # 最初日期为 1990-12-19
     history = fetch_history('000001', None, None, True)
-    tdates = []
-    for d in history.index:
-        tdates.append(d)
-    last_month_tdates = hist_tdates()
-    tdates.extend(last_month_tdates)
+    tdates = [d for d in history.index]
+    last_month = hist_tdates()
+    tdates.extend(last_month)
     tdates = list(set(tdates))
     tdates = sorted(tdates)
-    add_info(tdates)
-    print('done')
+    update(tdates, last_month)
+    logger.info('完成')
+
+
+def get_tdates():
+    """交易日列表
+
+    Returns:
+        list: 交易日`datetime`列表
+    """
+    db = get_db('stockdb')
+    collection = db['交易日历']
+    if collection.estimated_document_count() == 0:
+        refresh()
+    return collection.find_one()['tdates']
 
 
 def is_trading_day(dt):
-    """是否为交易日历"""
+    """是否为交易日
+
+    Args:
+        dt (Timestamp): 输入时间
+
+    Returns:
+        bool: 如为交易日返回True，否则返回False
+    """
     assert isinstance(dt, pd.Timestamp)
     dt = ensure_dt_localize(dt).tz_localize(None).normalize()
-    df = TradingDateStore.query()
-    return dt.to_datetime64() in df['trading_date'].values
+    tdates = get_tdates()
+    return dt.to_pydatetime() in tdates

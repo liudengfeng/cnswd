@@ -1,11 +1,13 @@
 """新浪24*7财经新闻
 """
-from cnswd._selenium import make_headless_browser
 import time
-from cnswd.utils import make_logger
+
 import pandas as pd
 
-logger = make_logger('财经新闻')
+from .._seleniumwire import make_headless_browser
+from ..utils import make_logger
+
+logger = make_logger('新浪财经新闻')
 
 TOPIC_MAPS = {
     0: '全部',
@@ -103,7 +105,7 @@ class Sina247News(object):
                 time.sleep(0.2)
             self.scrolling()
             time.sleep(0.1)
-            logger.info(f'当前栏目：{TOPIC_MAPS[tag]} 第{i+1:>4}页')
+            logger.info(f'当前栏目：{TOPIC_MAPS[tag]:>6} 第{i+1:>4}页')
         # 滚动完成后，一次性读取div元素
         divs = self.driver.find_elements_by_css_selector(div_css)
         return [self._parse(div, tag) for div in divs]
@@ -113,7 +115,7 @@ class Sina247News(object):
         # `全部`与分项重叠
         dfs = []
         for tag in TOPIC_MAPS.keys():
-            logger.info(f'当前栏目：{TOPIC_MAPS[tag]}')
+            # logger.info(f'当前栏目：{TOPIC_MAPS[tag]}')
             res = self._get_topic_news(tag, pages)
             dfs.append(_to_dataframe(res))
         df = pd.concat(dfs, sort=True, ignore_index=True)
@@ -125,6 +127,6 @@ class Sina247News(object):
         """历史财经新闻（迭代输出）"""
         # `全部`与分项重叠
         for tag in TOPIC_MAPS.keys():
-            logger.info(f'当前栏目：{TOPIC_MAPS[tag]}')
+            # logger.info(f'当前栏目：{TOPIC_MAPS[tag]:>8}')
             res = self._get_topic_news(tag, pages)
             yield _to_dataframe(res)

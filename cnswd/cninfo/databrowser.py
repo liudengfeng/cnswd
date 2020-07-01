@@ -1,450 +1,266 @@
-import json
-import os
+"""
+初始化无头浏览器 约 12s
+"""
 import random
 import re
 import time
 
 import pandas as pd
-from selenium.common.exceptions import ElementNotInteractableException
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import Select, WebDriverWait
 
-from .._exceptions import FutureDate, RetryException
-from .._seleniumwire import make_headless_browser
-from ..setting.config import DB_CONFIG, POLL_FREQUENCY, TIMEOUT
-from ..utils import ensure_list, make_logger, sanitize_dates
-from ..utils.loop_utils import loop_codes, loop_period_by
-from ..utils.pd_utils import _concat
-from .ops import (change_year, datepicker, navigate, toggler_open,
-                  wait_for_activate, wait_for_all_presence, wait_for_preview,
-                  wait_for_visibility, wait_page_loaded)
-from .utils import get_field_map
+from ..utils import sanitize_dates
+from .base_driver import INTERVAL, SZXPage
+from .ops import (datepicker, element_attribute_change_to,
+                  element_text_change_to, find_by_id, input_code,
+                  parse_path_response, select_quarter, select_year,
+                  simulated_click)
+from .utils import cleaned_data
+
+LEVEL_PAT = re.compile(r"\d{1,3}|[a-z]\d[a-z1-9]")
 
 
-class DataBrowser(object):
+def level_like(x):
+    # 项目层级仅仅包含数字和小写字符
+    # 此处简单判断是否为层级
+    # 否则视同为项目中文名称
+    return LEVEL_PAT.match(x) is not None
+
+
+class DataBrowser(SZXPage):
     """深证信数据浏览器基础类"""
-    # 类公用变量
-    api_name = ''
-    config = DB_CONFIG
-    # 以此元素是否显示为标准，检查页面是否正确加载
-    check_loaded_css = '.nav-second > div:nth-child(1) > h1:nth-child(1)'
-    check_loaded_css_value = api_name
+    api_name = '数据浏览器'
+    api_ename = 'dataBrowse'
+    query_btn_css = '.stock-search'
+    delay = 0
 
-    def __init__(self, log_to_file=None):
-        self.log_to_file = log_to_file
-        self.driver = None
-        self.init_driver = False
-        name = f"{self.api_name}{str(os.getpid()).zfill(6)}"
-        self.logger = make_logger(name, self.log_to_file)
+    def nav_tab(self, nth):
+        """选择快速搜索或高级搜索
 
-    def _ensure_init(self):
-        url = 'http://webapi.cninfo.com.cn/#/dataBrowse'
-        start = time.time()
-        self.driver = make_headless_browser()
-        self.wait = WebDriverWait(self.driver, TIMEOUT, POLL_FREQUENCY)
-        name = f"{self.api_name}{str(os.getpid()).zfill(6)}"
-        self.logger = make_logger(name, self.log_to_file)
-        self.driver.get(url)
-        # 确保加载完成
-        msg = f"首次加载{self.api_name}超时"
-        # 特定元素可见，完成首次页面加载
-        wait_page_loaded(self.wait, self.check_loaded_css,
-                         self.check_loaded_css_value, msg)
-        self.driver.implicitly_wait(1.5)
-        self.logger.notice(f'加载主页用时：{(time.time() - start):>0.4f}秒')
-        self._base_config()
-        self.init_driver = True
+        Args:
+            nth (int): 1代表快速搜索，2代表高级搜索
+        """
+        current_tab = getattr(self, 'current_tab', None)
+        if current_tab == nth:
+            return
+        assert nth in (1, 2)
+        css = "btn{}".format(nth)
+        btn = self.wait.until(EC.element_to_be_clickable((By.ID, css)))
+        btn.click()
+        self.current_tab = nth
 
-    def _base_config(self):
-        # 类变量
-        self.code_loaded = False
-        self.current_level = ''
-        self.current_t1_css = ''
-        self.current_t2_css = ''
-        self.current_t1_value = ''
-        self.current_t2_value = ''
-        self.current_code = ''
+    # 基于日期过滤元素显示特性判断输入方式
+    def _current_dt_filter_mode(self):
+        """当前时间过滤输入模式"""
+        cond_css = [
+            '.condition1', '.condition2', 'div.filter-condition:nth-child(3)',
+            '.condition4'
+        ]
+        elems = [
+            self.driver.find_element_by_css_selector(css) for css in cond_css
+        ]
+        res = [self._is_view(elem) for elem in elems]
+        if not any(res):
+            return None  # 无时间限制
+        elif res[3] and sum(res[:3]) == 0:
+            return 'Y'  # 只输入年
+        elif all(res[:2]) and sum(res[2:]) == 0:
+            return 'YQ'  # 输入年、季度
+        elif res[2] and sum(res) == 1:
+            return 'DD'  # 输入 date ~ date
+        raise ValueError(f"算法出错")
 
-        # 转换模式
-        self._bt()
+    def _current_period_type(self):
+        """期间内部循环类型"""
+        # 根据输入参数有关日期部分决定日期设置行为
+        # 第一个字符代表freq
+        # freq D | M | Q | Y
+        # 第二个字符代表日期格式
+        # 表达式 Y: 2019 | Q 2019 1 | D 2019-01-11
+        mode = self._current_dt_filter_mode()
+        tab_id = self.tab_id
+        level = self.api_level
+        if mode is None:
+            return None
+        elif mode == 'DD':
+            # 网站设定限制，每次返回最大20000行
+            # 数量量大的项目，每次取一个月的数据
+            # 由于可能存在网站菜单栏目变动问题，映射表可能发生变化
+            # 当前硬编码将`投资评级`设定为按月循环，数据量大约在10000行以内
+            # 至于其他栏目甚至可以一次性读取，此处简化为统一按季度内部循环
+            if tab_id == 2 and level in ('3', ):
+                return 'MD'
+            # 否则按季度循环
+            return 'QD'
+        elif mode == 'YQ':
+            # 按季度循环，输入年、季度
+            return 'QQ'
+        elif mode == 'Y':
+            # 按年循环，只输入年份
+            return 'YY'
+        raise ValueError("期间类型可能设置错误")
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        if self.driver:
-            self.driver.quit()
-
-    def reset(self):
-        """恢复至初始状态"""
-        self._ensure_init()
-        # 一般而言出现异常均有提示信息出现
-        try:
-            self.driver.switch_to.alert.dismiss()
-        except Exception:
-            pass
-        # 刷新浏览器
-        self.driver.refresh()
-        # self.driver.implicitly_wait(0.5)
-        time.sleep(1.5)
-        # 恢复基础配置
-        self._base_config()
-
-    def _bt(self):
-        raise NotImplementedError('子类中完成')
-
-    def _view_message(self, p, level, start, end, s=''):
-        """构造显示信息"""
-        width = 30
-        if level is None:
-            item = ''
-        else:
-            item = f"{self.config[level]['name']}({level})"
-        if pd.api.types.is_number(start):
-            if pd.api.types.is_number(end):
-                msg = f'{start}年{end}季度'
-            else:
-                if end:
-                    msg = f'{start}年 ~ {end}'
-                else:
-                    msg = f'{start}年'
-        else:
-            if start:
-                msg = pd.Timestamp(start).strftime(r'%Y-%m-%d')
-                if end:
-                    msg += f" ~ {pd.Timestamp(end).strftime(r'%Y-%m-%d')}"
-                else:
-                    msg = f"{pd.Timestamp(start).strftime(r'%Y-%m-%d')} ~ {pd.Timestamp('today').strftime(r'%Y-%m-%d')}"
-            else:
-                msg = ''
-        left = f"{p}{item}"
-        return f"{left:{width}} {msg} {s}"
-
-    def _log_info(self, p, level, start, end, s=''):
-        self.logger.info(self._view_message(p, level, start, end, s))
-
-    def select_nav(self, level):
-        if self.current_level != level:
-            navigate(self.driver, level)
-            self.current_level = level
-
-    def _load_all_code(self, codes):
-        """选择查询的股票代码"""
-        pass
+    def _set_date_filter(self, t1, t2):
+        mode = self._current_period_type()
+        if mode is None:
+            return
+        dt_fmt = mode[1]
+        # 开始日期 ~ 结束日期
+        if dt_fmt == 'D':
+            if t1:
+                css_1 = "input.date:nth-child(1)"
+                datepicker(self, t1, css_1)
+            if t2:
+                css_2 = "input.form-control:nth-child(2)"
+                datepicker(self, t2, css_2)
+        # 年 季度
+        if t1 and dt_fmt == 'Q':
+            select_year(self, t1)
+            select_quarter(self, t2)
+        # 年
+        if t1 and dt_fmt == 'Y':
+            # 特殊
+            select_year(self, t1, 'se2')
 
     def _before_read(self):
-        pass
-
-    def set_t1_value(self, t1):
-        """更改查询t1值"""
-        self.current_t1_css = self.config[self.current_level]['css'][0]
-        if self.current_t1_css and (t1 != self.current_t1_value):
-            # self.scroll(0.7)
-            # 输入日期字符串时
-            if 'input' in self.current_t1_css:
-                datepicker(self.driver, self.current_t1_css, t1)
-                self.current_t1_value = t1
-            elif self.current_t1_css in ('#se1_sele', '#se2_sele'):
-                change_year(self.driver, self.current_t1_css, t1)
-                self.current_t1_value = t1
-
-    def set_t2_value(self, t2):
-        """更改查询t2值"""
-        self.current_t2_css = self.config[self.current_level]['css'][1]
-        if self.current_t2_css and (t2 != self.current_t2_value):
-            # self.scroll(0.7)
-            if 'input' in self.current_t2_css:
-                datepicker(self.driver, self.current_t2_css, t2)
-                self.current_t2_value = t2
-            elif self.current_t2_css.startswith('.condition2'):
-                elem = self.driver.find_element_by_css_selector(
-                    self.current_t2_css)
-                t2 = int(t2)
-                assert t2 in (1, 2, 3, 4), '季度有效值为(1,2,3,4)'
-                select = Select(elem)
-                select.select_by_index(t2 - 1)
-                self.current_t2_value = t2
-
-    def _get_target_paths(self):
-        paths = []
-        api_key = self.config[self.current_level]['api_key']
-        for r in self.driver.requests:
-            if r.method == 'POST' and api_key in r.path:
-                paths.append(r.path)
-        return paths
-
-    def _read_json_data(self):
-        res = []
-        paths = self._get_target_paths()
-        for p in sorted(paths):
-            # s = time.time()
-            # 加大超时时长
-            r = self.driver.wait_for_request(p, timeout=90)
-            # print(f'{p} 等待时长:{time.time() - s:0.4f}')
-            # print('状态码', r.response.status_code)
-            data = json.loads(r.response.body)
-            res.extend(data['records'])
-            # print(f"行数 {data['total']}")
-        # 删除已经读取的请求
-        del self.driver.requests
-        return res
-
-    def _get_data(self, t1, t2):
-        """读取项目数据"""
-        self.set_t1_value(t1)
-        self.set_t2_value(t2)
-        # 点击预览按钮
-        btn = '.stock-search'
-        self.driver.find_element_by_css_selector(btn).click()
-        self._before_read()
-        return self._read_json_data()
-
-    def get_loop_period(self, level, start, end):
-        loop_str = self.config[level]['date_freq'][0]
-        include = self.config[level]['date_freq'][1]
-        # 第一个字符指示循环周期freq
-        freq = loop_str[0]
-        return loop_period_by(start, end, freq, include)
-
-    def get_data(self, level, start=None, end=None):
-        raise NotImplementedError('子类中完成')
-
-    def click_elem(self, elem):
-        """点击所选元素"""
-        self.driver.execute_script("arguments[0].scrollIntoView();", elem)
-        actions = ActionChains(self.driver)
-        actions.move_to_element(elem).click().perform()
-
-    def scroll(self, size):
-        """
-        上下滚动到指定位置
-
-        参数:
-        ----
-        size: float, 屏幕自上而下的比率
-        """
-        # 滚动到屏幕底部
-        # self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        h = self.driver.get_window_size()['height']
-        js = f"var q=document.documentElement.scrollTop={int(size * h)}"
-        self.driver.execute_script(js)
+        """等待数据完成加载"""
+        css = '.span_target'
+        locator = (By.CSS_SELECTOR, css)
+        self.wait.until(
+            element_attribute_change_to(locator, 'style', 'display: none;'))
 
 
 class FastSearcher(DataBrowser):
     """
-    快速搜索
+    搜索单个股票期间项目信息[深证信-数据浏览器-快速搜索]
 
-    备注：
-        单只股票期间循环方式不同于高级搜索
+    Usage:
+        >>> api = FastSearch()
+        >>> api.get_data('个股报告期利润表','000333','2018-01-01','2019-12-31')
+        >>> api.driver.quit()
     """
-    api_name = '快速搜索'
-    input_code_css = '#input_code'
+    api_name = '数据浏览器-快速搜索'
+    tab_id = 1
+    delay = 0
 
-    def _bt(self):
-        try:
-            self.driver.find_element_by_id('btn1').click()
-        except Exception:
-            pass
-
-    def _select_code(self, code):
-        """输入代码"""
-        elem = self.driver.find_element_by_css_selector(self.input_code_css)
-        elem.clear()
-        elem.send_keys(code)
-        # 选中第一项
-        searched_css = 'div.searchDataRes:nth-child(2) > p:nth-child(1)'
-        wait_for_visibility(self.driver, searched_css)
-        self.driver.find_element_by_css_selector(searched_css).click()
-        self.current_code = code
-
-    def _loop_by_period(self, level, start, end):
-        """分时期段读取数据"""
-        loop_str = self.config[level]['date_freq'][0]
-        if loop_str is None:
-            return self._get_data(None, None)
-        # 第二个字符指示值的表达格式
-        fmt_str = loop_str[1]
-        if fmt_str in ('B', 'D', 'W', 'M'):
-            # 单个股票期间数据量小
-            # 对于单个股票期间数据无需循环，直接设置期间即可
-            start = pd.Timestamp(start)
-            end = pd.Timestamp(end)
-            t1, t2 = start.strftime(r'%Y-%m-%d'), end.strftime(r'%Y-%m-%d')
-            data = self._get_data(t1, t2)
-            return data
-
-        ps = self.get_loop_period(level, start, end)
-        if fmt_str == 'Q':
-
-            def t1_fmt_func(x):
-                return x.year
-
-            def t2_fmt_func(x):
-                return x.quarter
-        elif fmt_str == 'Y':
-
-            def t1_fmt_func(x):
-                return x.year
-
-            def t2_fmt_func(x):
-                return None
-        else:
-            raise ValueError(f'{loop_str}为错误格式。')
-        res = []
-        for s, e in ps:
-            t1, t2 = t1_fmt_func(s), t2_fmt_func(e)
-            self.logger.info(f'>  时段 {t1} ~ {t2}')
-            data = self._get_data(t1, t2)
-            res.extend(data)
-        return res
-
-    def _try_get_data(self, level, code, start=None, end=None):
-        start, end = sanitize_dates(start, end)
-        if not self.init_driver:
-            self._ensure_init()
-        self._bt()
-        self.select_nav(level)
-        assert re.compile(r'^\d{6}$').match(
-            code), f'`code`参数应为6位数字的股票代码，实际为：{code}'
-        self._select_code(code)
-        self._log_info(self.current_code, level, start, end)
-        data = self._loop_by_period(level, start, end)
-        columns_mapper = get_field_map('db', level)
-        data = pd.DataFrame.from_dict(data)
-        # 不存在没有列映射表时，返回原始表
-        if len(columns_mapper) == 0:
-            return data
-        df = pd.DataFrame()
-        if not data.empty:
-            # 保持列原始顺序
-            for k, v in columns_mapper.items():
-                df[v] = data[k]
-        return df
-
-    def get_data(self, level, code, start=None, end=None):
+    def get_data(self, level_or_name, code, start=None, end=None):
         """获取项目数据
 
         Arguments:
-            level {str} -- 项目层级
+            level_or_name {str} -- 项目层级或层级全称
             code {str} -- 股票代码
 
         Keyword Arguments:
             start {str} -- 开始日期 (default: {None})，如为空，使用市场开始日期
             end {str} -- 结束日期 (default: {None})，如为空，使用当前日期
 
-
-        Usage:
-            >>> api = FastSearch()
-            >>> api.get_data('2.1','000333', '2018-01-01','2018-08-10')
-            >>> api.driver.quit()
-
         Returns:
-            pd.DataFrame -- 如期间没有数据，返回长度为0的空表
+            list -- 数据字典列表
         """
-        for i in range(1, 6):
-            try:
-                return self._try_get_data(level, code, start, end)
-            except FutureDate:
-                return pd.DataFrame()
-            except Exception as e:
-                # 删除请求
-                del self.driver.requests
-                self.reset()
-                self.logger.notice(f"第{i}次尝试\n\n {e!r}")
-                time.sleep(random.random())
-        raise RetryException(f"尝试失败")
+        self.ensure_init()
+        self.nav_tab(self.tab_id)
+        if not level_like(level_or_name):
+            level = self.name_to_level(level_or_name)
+        else:
+            level = level_or_name
+        start, end = sanitize_dates(start, end)
+        self.to_level(level)
+        # 首先需要解析元数据
+        meta = self.get_level_meta_data(level)
+        field_maps = meta['field_maps']
+        # 当前数据项目中文名称
+        self.current_item = meta['api_name']
+        input_code(self, code)
+        data = self._read_data_by_period(start, end)
+        return cleaned_data(data, field_maps)
 
 
 class AdvanceSearcher(DataBrowser):
-    """高级搜索"""
-    api_name = '高级搜索'
-    _codes = None
+    """搜索全部股票期间项目信息[深证信-数据浏览器-高级搜索]
 
-    def _bt(self):
-        try:
-            self.driver.find_element_by_id('btn2').click()
-        except Exception:
-            pass
+    Usage:
+        >>> api = AdvanceSearcher()
+        >>> api.get_data('个股报告期利润表','2018-01-01','2019-12-31')
+        >>> api.driver.quit()    
+    """
+    api_name = '数据浏览器-高级搜索'
+    tab_id = 2
+    delay = 0
+
+    @property
+    def stocks_in_trading(self):
+        """全市场股票代码"""
+        # 用时约3秒
+        codes = getattr(self, '_codes', {})
+        # 由于加载成功后会缓存在本地，后续加载会很快完成
+        # 作为一个副产品，可以用于判断市场股票数量的依据
+        nums = getattr(self, '_nums', {})
+        if not nums:
+            data_ids = ['101', '102', '107', '108', '110', '106', '109']
+            for data_id in data_ids:
+                api_elem = find_by_id(self, data_id)
+                data_name = api_elem.get_attribute('data-name')
+                data_api = api_elem.get_attribute('data-api')
+                data_param = api_elem.get_attribute('data-param')
+                data_path = f"{data_api}?{data_param}"
+                # 直接使用模拟点击，简化操作
+                simulated_click(self, api_elem)
+                self.driver.implicitly_wait(INTERVAL)
+                data = parse_path_response(self, data_path)
+                num = len(data)
+                nums[data_id] = num
+                self.logger.info(f"{data_name}(股票数量：{num})")
+                if num:
+                    codes.update({d['SECCODE']: d['SECNAME'] for d in data})
+                # del self.driver.requests
+            self._nums = nums
+            self._codes = codes
+        return self._codes
+
+    def _load_all_code(self):
+        """加载全部股票代码"""
+        code_loaded = getattr(self, '_code_loaded', False)
+        if code_loaded:
+            return
+        # 调用属性，确保生成数量字典
+        codes = self.stocks_in_trading
+        add_label_css = '.cont-top-right > div:nth-child(1) > div:nth-child(1) > label:nth-child(1) > i:nth-child(2)'
+        add_btn_css = '.cont-top-right > div:nth-child(2) > div:nth-child(1) > button:nth-child(1)'
+        check_css = '.cont-top-right > div:nth-child(1) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
+        locator = (By.CSS_SELECTOR, check_css)
+        data_ids = ['101', '102', '107', '108', '110', '106', '109']
+        for data_id in data_ids:
+            api_elem = find_by_id(self, data_id)
+            data_name = api_elem.get_attribute('data-name')
+            data_api = api_elem.get_attribute('data-api')
+            # 直接使用模拟点击，简化操作
+            simulated_click(self, api_elem)
+            # 模拟点击后务必预留时间
+            self.driver.implicitly_wait(INTERVAL)
+            num = self._nums[data_id]
+            text = str(num)
+            self.wait.until(element_text_change_to(locator, text))
+            # sleep = random.uniform(0.0, num / 2000)
+            # self.driver.implicitly_wait(sleep)
+            # self.driver.save_screenshot(f"{data_id}.png")
+            # 仅当数量不为0时执行添加
+            if self._nums[data_id]:
+                # 全部添加
+                self._add_or_delete_all(add_label_css, add_btn_css)
+        total_css = '.cont-top-right > div:nth-child(3) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
+        actual = int(self.driver.find_element_by_css_selector(total_css).text)
+        expected = sum(self._nums.values())
+        assert actual == expected, f"股票总数应为：{expected}，实际：{actual}"
+        self._code_loaded = True
 
     def _select_all_fields(self):
         """全选字段"""
         # 使用i元素
-        label_css = '.detail-cont-bottom > div:nth-child(1) > div:nth-child(1) > label:nth-child(1)'
+        # label_css = '.detail-cont-bottom > div:nth-child(1) > div:nth-child(1) > label:nth-child(1)'
+        label_css = '.detail-cont-bottom > div:nth-child(1) > div:nth-child(1) > label:nth-child(1) > i:nth-child(2)'
         btn_css = '.detail-cont-bottom > div:nth-child(2) > div:nth-child(1) > button:nth-child(1)'
         # 全选数据字段
         self._add_or_delete_all(label_css, btn_css)
-
-    def _load_all_code(self):
-        """选择查询的股票代码"""
-        if self.code_loaded:
-            return
-        markets = ['深市A', '深市B', '中小板', '创业板', '沪市A', '沪市B', '科创板']
-        market_cate_css = '.classify-tree > li:nth-child(6)'
-        wait_for_visibility(self.driver, market_cate_css)
-        li = self.driver.find_element_by_css_selector(market_cate_css)
-        toggler_open(li)
-        xpath_fmt = "//a[@data-name='{}']"
-        to_select_css = '.cont-top-right > div:nth-child(1) > div:nth-child(3) > ul:nth-child(1) li'
-        add_label_css = '.cont-top-right > div:nth-child(1) > div:nth-child(1) > label:nth-child(1)'
-        add_btn_css = '.cont-top-right > div:nth-child(2) > div:nth-child(1) > button:nth-child(1)'
-        for market in markets:
-            self.logger.info(f"加载{market}代码")
-            # 选择市场分类
-            self.driver.find_element_by_xpath(xpath_fmt.format(market)).click()
-            wait_for_activate(self.driver, market)
-            # 等待加载代码
-            wait_for_all_presence(self.driver, to_select_css, '加载市场分类代码')
-            # 全部添加
-            self._add_or_delete_all(add_label_css, add_btn_css)
-        self.code_loaded = True
-
-    def _choose_code(self, code):
-        elem = self.driver.find_element_by_xpath(f"//span[@data-id='{code}']")
-        elem.find_element_by_xpath('../i').click()
-
-    def _code_num(self, css):
-        n = self.driver.find_element_by_css_selector(css).text
-        try:
-            return int(n)
-        except Exception:
-            return 0
-
-    def _delete_selected_code(self):
-        css = '.cont-top-right > div:nth-child(3) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
-        num = self._code_num(css)
-        if num:
-            del_label_css = '.cont-top-right > div:nth-child(3) > div:nth-child(1) > label:nth-child(1)'
-            del_btn_css = '.cont-top-right > div:nth-child(2) > div:nth-child(1) > button:nth-child(2)'
-            self._add_or_delete_all(del_label_css, del_btn_css)
-
-    def _select_all_code(self):
-        css = '.cont-top-right > div:nth-child(1) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
-        num = self._code_num(css)
-        if num:
-            add_label_css = '.cont-top-right > div:nth-child(1) > div:nth-child(1) > label:nth-child(1)'
-            add_btn_css = '.cont-top-right > div:nth-child(2) > div:nth-child(1) > button:nth-child(1)'
-            self._add_or_delete_all(add_label_css, add_btn_css)
-
-    def _reload_all_code(self):
-        self._delete_selected_code()
-        self._select_all_code()
-
-    def _set_query_codes(self, codes):
-        """设置查询代码"""
-        self._load_all_code()
-        if codes is None:
-            self._reload_all_code()
-            return
-        codes = ensure_list(codes)
-        # 将全部股票放入待选区
-        self._delete_selected_code()
-        # 选择查询代码
-        for code in codes:
-            self._choose_code(code)
-        add_css = '.cont-top-right > div:nth-child(2) > div:nth-child(1) > button:nth-child(1)'
-        self.driver.find_element_by_css_selector(add_css).click()
 
     def _add_or_delete_all(self, label_css, btn_css):
         """添加或删除所选全部元素"""
@@ -453,118 +269,48 @@ class AdvanceSearcher(DataBrowser):
         # 点击命令按钮
         self.driver.find_element_by_css_selector(btn_css).click()
 
-    def _before_read(self):
-        """等待数据完成加载"""
-        css = '.onloading'
-        locator = (By.CSS_SELECTOR, css)
-        self.wait.until(EC.invisibility_of_element(locator))
-
-    def _loop_by_period(self, level, start, end):
-        """分时期段读取数据"""
-        loop_str = self.config[level]['date_freq'][0]
-        if loop_str is None:
-            return self._get_data(None, None)
-        ps = self.get_loop_period(level, start, end)
-        # 第二个字符指示值的表达格式
-        fmt_str = loop_str[1]
-        if fmt_str in ('B', 'D', 'W', 'M'):
-
-            def t1_fmt_func(x):
-                return x.strftime(r'%Y-%m-%d')
-
-            def t2_fmt_func(x):
-                return x.strftime(r'%Y-%m-%d')
-        elif fmt_str == 'Q':
-
-            def t1_fmt_func(x):
-                return x.year
-
-            def t2_fmt_func(x):
-                return x.quarter
-        elif fmt_str == 'Y':
-
-            def t1_fmt_func(x):
-                return x.year
-
-            def t2_fmt_func(x):
-                return None
-        else:
-            raise ValueError(f'{loop_str}为错误格式。')
-        res = []
-        for s, e in ps:
-            t1, t2 = t1_fmt_func(s), t2_fmt_func(e)
-            data = self._get_data(t1, t2)
-            self.logger.info(f'>  时段 {t1} ~ {t2} 行数 {len(data)}')
-            res.extend(data)
-        return res
-
-    def _ensure_select_all_fields(self):
-        css = '.detail-cont-bottom > div:nth-child(1) > div:nth-child(3) > ul:nth-child(1) li'
-        lis = self.driver.find_elements_by_css_selector(css)
-        # 只有有待选字段，就执行
-        if len(lis):
+    def _before_query(self):
+        """执行查询前应完成的动作"""
+        # 高级搜索需要加载全部代码、全选擦查询字段
+        self._load_all_code()
+        chech_css = '.detail-cont-bottom > div:nth-child(3) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
+        num = int(self.driver.find_element_by_css_selector(chech_css).text)
+        # 只有非0时才需要全选字段
+        if not num:
             self._select_all_fields()
 
-    @property
-    def codes(self):
-        """当前交易状态中的股票列表"""
-        if self._codes is None:
-            df = self.get_data('1', codes=None)
-            self._codes = df['股票代码'].to_list()
-        return self._codes
-
-    def _try_get_data(self, level, start=None, end=None, codes=None):
-        start, end = sanitize_dates(start, end)
-        if not self.init_driver:
-            self._ensure_init()
-        self._bt()
-        # 务必保持顺序，否则由于屏幕位置滚动导致某些元素不可点击
-        self.select_nav(level)  # 1 选择 项目
-        self._set_query_codes(codes)  # 2 加载股票代码
-        self._ensure_select_all_fields()  # 3 加载字段
-        self._log_info('==> ', level, start, end, " <==")
-        data = self._loop_by_period(level, start, end)  # 4 设置期间
-        columns_mapper = get_field_map('db', level)
-        data = pd.DataFrame.from_dict(data)
-        # 不存在没有列映射表时，返回原始表
-        if len(columns_mapper) == 0:
-            return data
-        df = pd.DataFrame()
-        if not data.empty:
-            # 保持列原始顺序
-            for k, v in columns_mapper.items():
-                df[v] = data[k]
-        return df
-
-    def get_data(self, level, start=None, end=None, codes=None):
-        """获取项目所有股票期间数据
+    def get_data(self, level_or_name, start=None, end=None):
+        """获取项目数据
+        与快速搜索不同，高级搜索限定为当前全部股票
 
         Arguments:
-            level {str} -- 项目层级
+            level_or_name {str} -- 项目层级或层级全称
 
         Keyword Arguments:
             start {str} -- 开始日期 (default: {None})，如为空，使用市场开始日期
             end {str} -- 结束日期 (default: {None})，如为空，使用当前日期
-            codes {list like} -- 股票代码 (default: {None})，如为空，使用全部代码
-
 
         Usage:
             >>> api = AdvanceSearcher()
-            >>> api.get_data('4.1','2018-01-01','2018-08-01')
+            >>> api.get_data('21', '2018-01-01','2018-08-10')
             >>> api.driver.quit()
 
         Returns:
-            pd.DataFrame -- 如期间没有数据，返回长度为0的空表
+            list -- 数据字典列表
         """
-        for i in range(1, 6):
-            try:
-                return self._try_get_data(level, start, end, codes)
-            except FutureDate:
-                return pd.DataFrame()            
-            except Exception as e:
-                # 删除请求
-                del self.driver.requests
-                self.reset()
-                self.logger.notice(f"第{i}次尝试\n\n {e!r}")
-                time.sleep(random.random())
-        raise RetryException(f"尝试失败")
+        self.ensure_init()
+        self.nav_tab(self.tab_id)
+        if not level_like(level_or_name):
+            level = self.name_to_level(level_or_name)
+        else:
+            level = level_or_name
+        start, end = sanitize_dates(start, end)
+        self.to_level(level)
+        # 首先需要解析元数据
+        meta = self.get_level_meta_data(level)
+        field_maps = meta['field_maps']
+        # 当前数据项目中文名称
+        self.current_item = meta['api_name']
+        self._before_query()
+        data = self._read_data_by_period(start, end)
+        return cleaned_data(data, field_maps)

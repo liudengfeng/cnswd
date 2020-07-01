@@ -3,441 +3,269 @@
 深证信基础模块
 
 """
-import math
 import os
-import re
+import random
 import time
+import warnings
 
 import pandas as pd
-from bs4 import BeautifulSoup
-from selenium.common.exceptions import (ElementNotInteractableException,
-                                        NoSuchElementException,
-                                        TimeoutException)
-from selenium.webdriver.common.action_chains import ActionChains
+from retry.api import retry_call
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
+from selenium.common.exceptions import TimeoutException
 
-from .._exceptions import MaybeChanged, RetryException
-from .._selenium import make_headless_browser
+from .._seleniumwire import make_headless_browser
 from ..setting.config import POLL_FREQUENCY, TIMEOUT
-from ..utils.log_utils import make_logger
-from ..utils.pd_utils import _concat
-from .ops import (element_attribute_change_to, navigate, read_html_table,
-                  wait_page_loaded)
+from ..utils import make_logger
+from ..utils.loop_utils import batch_loop, loop_period_by
+from .ops import (datepicker, get_nav_info, input_code,
+                  element_attribute_change_to, parse_path_response, find_by_id,
+                  element_text_change_to, navigate, parse_meta_data,
+                  read_json_data, simulated_click, select_year, select_quarter)
+
+from .utils import cleaned_data
+# ssl 握手信息提示
+# warnings.filterwarnings('ignore')
+INTERVAL = 0.3
+
+custom_options = {
+    'connection_timeout': 20,  # 默认为5s，连接经常出现故障，调整
+    'verify_ssl': False,
+    # 'connection_keep_alive': False,
+    'suppress_connection_errors': True
+}
 
 HOME_URL_FMT = 'http://webapi.cninfo.com.cn/#/{}'
-PAGINATION_PAT = re.compile(r'共\s(\d{1,})\s条记录')
-
-
-def remove_duplicates(x):
-    """移除列名称中的重复项"""
-    if isinstance(x, int):
-        return x
-    n = len(x)
-    if x[:int(n / 2)] == x[-int(n / 2):]:
-        return x[:int(n / 2)]
-    else:
-        return x
-
-
-def normalize_code(df):
-    if '证券代码' in df.columns:
-        df.证券代码 = df.证券代码.map(lambda x: str(x).zfill(6))
-    if '股票代码' in df.columns:
-        df.股票代码 = df.股票代码.map(lambda x: str(x).zfill(6))
-    if '指数代码' in df.columns:
-        df.指数代码 = df.指数代码.map(lambda x: str(x).zfill(6))
-    return df
 
 
 class SZXPage(object):
     """深证信基础网页"""
 
-    # 变量
-    code_loaded = False
-    current_t1_value = ''  # 开始日期
-    current_t2_value = ''  # 结束日期
-    current_level = ''  # 顶部菜单层级
-
     # 子类需要改写的属性
     api_name = ''
-    api_e_name = ''
-    config = {}
-    # 以此元素是否显示为标准，检查页面是否正确加载
-    check_loaded_css = ''
-    check_loaded_css_value = ''
+    api_ename = ''
+    query_btn_css = ''
 
-    data_loaded_css = ''
-    data_loaded_css_value = ''
-    attrs = {'id': ''}  # 数据表id
-
-    level_input_css = ''
-    level_query_bnt_css = ''
-    preview_btn_css = ''  # 预览数据按钮
-    wait_for_preview_css = ''  # 检验预览结果css
-    view_selection = {}  # 可调显示行数 如 {1:10,2:20,3:50}
-
-    def __init__(self, log_to_file=None):
-        start = time.time()
-        self.log_to_file = log_to_file
-        self.driver = make_headless_browser()
-        name = f"{self.api_name}{str(os.getpid()).zfill(6)}"
-        self.logger = make_logger(name, log_to_file)
-        self.wait = WebDriverWait(self.driver, TIMEOUT, POLL_FREQUENCY)
-        self._load_page()
-        self.driver.maximize_window()
-        # 确保加载完成
-        self.driver.implicitly_wait(0.2)
-        self.logger.notice(f'加载主页用时：{(time.time() - start):>0.4f}秒')
-
-    def _load_page(self):
-        # 如果重复加载同一网址，耗时约为1ms
-        self.logger.info(self.api_name)
-        url = HOME_URL_FMT.format(self.api_e_name)
-        self.driver.get(url)
-        msg = f"首次加载{self.api_name}超时"
-        # 特定元素可见，完成首次页面加载
-        wait_page_loaded(self.wait, self.check_loaded_css,
-                         self.check_loaded_css_value, msg)
-
-    def _ul_num_map(self):
-        """二级导航所对应的ul元素序号映射"""
-        res = {}
-        for level in self.config.keys():
-            ls = level.split('.')
-            level_1 = ls[0]
-            if len(ls) >= 2 and res.get(level_1) is None:
-                res[level_1] = len(res) + 1
-        return res
-
-    def _select_level(self, level):
-        msg = f'"{self.api_name}"指标导航可接受范围：{list(self.config.keys())}'
-        assert level in self.config.keys(), msg
-        navigate(self.driver, level)
-
-    @property
-    def current_t1_css(self):
-        return self.config[self.current_level]['css'][0]
-
-    @property
-    def current_t2_css(self):
-        return self.config[self.current_level]['css'][1]
-
-    def reset(self):
-        self.scroll(0.0)
-        # self.driver.quit()
-        self.driver.refresh()
-
-        # 恢复变量默认值
-        self.code_loaded = False
-        self.current_level = ''
-        self.current_t1_value = ''  # 开始日期
-        self.current_t2_value = ''  # 结束日期
-
-        start = time.time()
-        # self.driver = make_headless_browser()
-        name = str(os.getpid()).zfill(6)
-        self.logger = make_logger(name, self.log_to_file)
-        # self.wait = WebDriverWait(self.driver, TIMEOUT)
-        self._load_page()
-        self.driver.maximize_window()
-        self.logger.notice(f'重新加载主页用时：{(time.time() - start):>0.4f}秒')
+    def __init__(self):
+        self.driver = None
+        self.logger = make_logger(self.api_name)
+        self.logger.info("生成无头浏览器")
+        self._meta_data = {}
+        delay = 0
 
     def __enter__(self):
         return self
 
     def __exit__(self, *args):
-        self.driver.quit()
+        if self.driver:
+            self.driver.quit()
 
-    def __repr__(self):
-        msg = self._view_message('', self.current_level, self.current_t1_value,
-                                 self.current_t2_value)
-        return msg
+    def __str__(self):
+        return f"{self.api_name}{str(os.getpid()).zfill(6)}"
 
-    def _wait_for_activate(self, data_name, status='active'):
-        """等待元素激活"""
-        xpath_fmt = "//a[@data-name='{}']"
-        locator = (By.XPATH, xpath_fmt.format(data_name))
-        self.wait.until(element_attribute_change_to(locator, 'class', status),
-                        f'{self.api_name} {data_name} 激活元素超时')
+    def ensure_init(self):
+        """初始化配置"""
+        inited = getattr(self, 'inited', False)
+        if inited:
+            return
+        start = time.time()
+        self.driver = make_headless_browser(custom_options)
+        self.wait = WebDriverWait(self.driver, TIMEOUT, POLL_FREQUENCY)
+        self.logger = make_logger(self.api_name)
+        self.driver.get(HOME_URL_FMT.format(self.api_ename))
+        self.driver.implicitly_wait(INTERVAL + self.delay)
+        check_css = '.nav-title'
+        m = EC.visibility_of_element_located((By.CSS_SELECTOR, check_css))
+        title = self.wait.until(m, message="加载主页失败")
+        expected = self.api_name.split('-')[0]
+        assert title.text == expected, f"完成加载后，标题应为:{expected}，实际为'{title.text}'。"
+        # self.driver.save_screenshot('p.png')
+        self.logger.info(f'加载耗时：{(time.time() - start):>0.2f}秒')
+        # 限定范围，提高性能
+        # http://webapi.cninfo.com.cn/api/sysapi/p_sysapi1017?apiname=p_stock2215
+        # http://webapi.cninfo.com.cn/api-cloud-platform/apiinfo/info?id=247
+        self.driver.scopes = [
+            'webapi.cninfo.com.cn',
+        ]
+        self.inited = True
 
-    def _wait_for_visibility(self, elem_css, msg=''):
+    @property
+    def levels(self):
+        """数据层级信息"""
+        self.ensure_init()
+        _levels = getattr(self, '_levels', None)
+        if not _levels:
+            self.logger.info("提取项目元数据信息......")
+            self._levels = get_nav_info(self)
+        return self._levels
+
+    def name_to_level(self, name):
+        for info in self.levels:
+            if info['名称'] == name:
+                return info['层级']
+        raise ValueError(f"不存在数据项目:{name}")
+
+    def get_level_meta_data(self, level):
+        """项目元数据
+
+        Args:
+            level (str): 项目层级
+
+        Returns:
+            dict: 元数据字典
         """
-        等待指定css元素可见
+        _meta_data = getattr(self, '_meta_data', {})
+        level_meta_data = _meta_data.get(level, {})
+        if not level_meta_data:
+            self.ensure_init()
+            self.to_level(level)
+            self._meta_data[level] = parse_meta_data(self)
+        return self._meta_data[level]
 
-        Arguments:
-            elem_css {str} -- 可见元素的css表达式
+    def to_level(self, level):
+        """导航至层级菜单
+
+        Args:
+            level (str): 指定菜单层级
         """
-        m = EC.visibility_of_element_located((By.CSS_SELECTOR, elem_css))
-        self.wait.until(m, message=msg)
+        # 默认值必须设置为空
+        current_level = getattr(self, 'current_level', '')
+        if current_level != level:
+            navigate(self, level)
+            self.current_level = level
+            self.driver.implicitly_wait(INTERVAL)
 
-    def _wait_for_all_presence(self, elem_css, msg=''):
-        """
-        等待指定css的所有元素出现
-
-        Arguments:
-            elem_css {str} -- 元素的css表达式
-        """
-        m = EC.presence_of_all_elements_located((By.CSS_SELECTOR, elem_css))
-        self.wait.until(m, message=msg)
-
-    def _get_count_tip(self, span_css):
-        """获取元素数量提示"""
-        i = self.driver.find_element_by_css_selector(
-            span_css).find_element_by_tag_name('i')
-        try:
-            return int(i.text)
-        except:
-            return 0
-
-    def click_elem(self, elem):
-        """点击所选元素"""
-        self.driver.execute_script("arguments[0].scrollIntoView();", elem)
-        actions = ActionChains(self.driver)
-        actions.move_to_element(elem).click().perform()
-        # name = f"{elem.text}.png"
-        # self.driver.save_screenshot(name)
-
-    def _add_or_delete_all(self, label_css, btn_css):
-        """添加或删除所选全部元素"""
-        # 点击全选元素
-        self.driver.find_element_by_css_selector(label_css).click()
-        # 点击命令按钮
-        self.driver.find_element_by_css_selector(btn_css).click()
-
-    def _query(self, input_text, input_css, query_bnt_css):
-        """
-        执行查询
-
-        在指定`input_css`元素输入`input_text`，点击`query_bnt_css`
-        执行查询
-        """
-        input_elem = self.driver.find_element_by_css_selector(input_css)
-        input_elem.clear()
-        input_elem.send_keys(input_text)
-        self.driver.find_element_by_css_selector(query_bnt_css).click()
-
-    def _no_data(self):
-        """等待预览呈现后，首先需要检查查询是否无数据返回"""
-        try:
-            e = self.driver.find_element_by_css_selector('.center')
-            if e.text in ('暂无记录', ):
-                return True
-            return False
-        except Exception:
-            return False
-
-    def _has_exception(self):
-        """等待预览呈现后，尽管有数据返回，检查是否存在异常提示"""
-        csss = ['.tips', '.cancel', '.timeout', '.sysbusy']
-        for css in csss:
-            try:
-                elem = self.driver.find_element_by_css_selector(css)
-                if elem.get_attribute('style') == 'display: inline;':
-                    msg = self + '\n', elem.text
-                    self.logger.notice(msg)
-                    return True
-            except Exception:
-                return False
-
-    def _get_row_num(self):
-        """获取预览输出的总行数"""
-        pagination_css = '.pagination-info'
-        pagination = self.driver.find_element_by_css_selector(pagination_css)
-        row_num = int(re.search(PAGINATION_PAT, pagination.text).group(1))
-        return row_num
-
-    def _get_pages(self):
-        """获取预览输出的总页数"""
-        # 如无法定位到`.page-last`元素，可能的情形
-        # 1. 存在指示页数的li元素，倒数第2项的li元素text属性标示页数；
-        # 2. 不存在li元素，意味着只有1页
-        try:
-            li_css = '.page-last'
-            li = self.driver.find_element_by_css_selector(li_css)
-            return int(li.text)
-        except Exception:
-            pass
-        # 尝试寻找li元素
-        try:
-            li_css = 'ul.pagination li'
-            lis = self.driver.find_elements_by_css_selector(li_css)
-            return int(lis[-2].text)
-        except Exception:
-            return 1
-
-    def _auto_change_view_row_num(self):
-        """自动调整到每页最大可显示行数"""
-        min_row_num = min(self.view_selection.values())
-        max_row_num = max(self.view_selection.values())
-        total = self._get_row_num()
-
-        if total <= min_row_num:
-            nth = min(self.view_selection.keys())
-        elif total >= max_row_num:
-            nth = max(self.view_selection.keys())
-        else:
-            for k, v in self.view_selection.items():
-                if total <= v:
-                    nth = k
-                    break
-        # 只有总行数大于最小行数，才有必要调整显示行数
-        if total > min_row_num:
-            # 点击触发可选项
-            self.driver.find_element_by_css_selector(
-                '.dropdown-toggle').click()
-            locator = (By.CSS_SELECTOR, '.btn-group')
-            try:
-                self.wait.until(
-                    element_attribute_change_to(locator, 'class',
-                                                'btn-group dropup open'),
-                    '调整每页显示行数超时')
-            except TimeoutException:
-                self.driver.implicitly_wait(0.5)
-            css = '.btn-group > ul:nth-child(2) li'
-            lis = self.driver.find_elements_by_css_selector(css)
-            lis[nth - 1].click()
-
-    def _before_read(self, bt):
-        raise NotImplementedError('子类必须完成读取前的准备')
-
-    def _read_html_data(self, bt=True):
-        """通用读取网页数据"""
-        self._before_read(bt)
-        if self._no_data():
-            return pd.DataFrame()
-        # 是否存在异常
-        if self._has_exception():
-            item = self.config[self.current_level]['name']
-            raise RetryException(f'项目：{item} 提取的网页数据不完整')
-        # 当表头不显示时，数据以序列形式读取；
-        # 存在
-        table_id = self.attrs['id']
-        table = self.driver.find_element_by_id(table_id)
-        thead = table.find_element_by_tag_name('thead')
-        thead_style = thead.get_attribute('style')
-        if thead_style == '':
-            return self._read_html_table()
-        elif thead_style == 'display: none;':
-            return self._read_series()
-        else:
-            raise MaybeChanged('数据表头显示风格属性可能已经调整！')
-
-    def _read_series(self):
-        """读取以序列数据"""
-        soup = BeautifulSoup(self.driver.page_source, "lxml")
-        # √ 使用
-        table_id = f"#{self.attrs['id']}"
-        table = soup.select_one(table_id)
-        titles = table.select('span[class="title"]')
-        values = table.select('span[class="value"]')
-        assert len(titles) == len(values), '标题与值数量应相等'
-        res = {}
-        for t, v in zip(titles, values):
-            # √ 以下方式才能避免无限递归错误
-            res[t['title']] = [v['title']]
-        # 序列数据以DataFrame返回
-        df = pd.DataFrame.from_dict(res)
-        return normalize_code(df)
-
-    def _read_html_table(self):
-        """读取当前网页数据表"""
-        # TODO:以下部分在子类中`_before_read`完成
-        # # 点击`预览数据`
-        # if self.api_e_name == 'thematicStatistics':
-        #     # 专题统计中，部分项目无命令按钮
-        #     if any(self.config[self.current_level]['css']):
-        #         # 预览数据
-        #         self.driver.find_element_by_css_selector(
-        #             self.preview_btn_css).click()
-        #     else:
-        #         # 没有预览按钮时，等待一小段时间
-        #         self.driver.implicitly_wait(0.1)
-        # elif self.api_e_name == 'marketData':
-        #     # 预览数据
-        #     self.driver.find_element_by_css_selector(
-        #         self.preview_btn_css).click()
-        # else:
-        #     # 预览数据
-        #     self.driver.find_element_by_css_selector(
-        #         self.preview_btn_css).click()
-        # 数据加载与tip好像有延时
-        # self.driver.implicitly_wait(0.1)
-        # if self.api_e_name not in ('marketData', 'marketZhishu'):
-        #     # 等待预览数据完成加载。如数据量大，可能会比较耗时。最长约6秒。
-        #     self._wait_for_preview(style='display: none;')
-
-        # 是否无数据返回
-        # 测试表明，专题统计不一定能准确捕获`.no-records-found`提示，导致后续无法获取数据行数
-        # 多次运行，可解决此类问题
-
-        # 自动调整显示行数，才读取页数
-        self._auto_change_view_row_num()
-        pages = self._get_pages()
-        n_width = 5  # 行数不超过5位数
-        dfs = []
-        na_values = ['-', '无', ';']
-        if pages == 1:
-            df = pd.read_html(self.driver.page_source,
-                              na_values=na_values,
-                              attrs=self.attrs)[0]
-            dfs.append(df)
-            self.logger.info(f'>> 分页 第{1:{n_width}}页 / 共{pages:{n_width}}页')
-        else:
-            for i in range(1, pages + 1):
-                df = read_html_table(self.driver, i, self.attrs)
-                self.logger.info(
-                    f'>> 分页 第{i:{n_width}}页 / 共{pages:{n_width}}页')
-                dfs.append(df)
-        res = _concat(dfs)
-        # 去除可能重复的表头
-        res.columns = res.columns.map(remove_duplicates)
-        res = normalize_code(res)
+    def _read_branch_data(self, t1, t2):
+        """读取分部数据"""
+        self._set_date_filter(t1, t2)
+        # 点击查询
+        btn_css = self.query_btn_css
+        btn = self.driver.find_element_by_css_selector(btn_css)
+        # 专题统计中部分项目隐藏命令按钮
+        if btn.is_displayed():
+            btn.click()
+        # 等待完全发送查询指令
+        retry_call(self._before_read, exceptions=(TimeoutException, ), tries=3)
+        res = read_json_data(self)
         return res
 
-    def _change_year(self, css, year):
-        """改变查询指定id元素的年份"""
-        elem = self.driver.find_element_by_css_selector(css)
-        elem.clear()
-        elem.send_keys(str(year))
+    def _internal_ps(self, start, end):
+        """输出(t1,t2)内部循环元组列表"""
+        assert isinstance(start, pd.Timestamp)
+        assert isinstance(end, pd.Timestamp)
+        loop_str = self._current_period_type()
+        if loop_str is None:
+            return [(None, None)]
+        freq = loop_str[0]
+        fmt_str = loop_str[1]
+        tab_id = getattr(self, 'tab_id', '')
+        # 单个股票可以一次性查询期间所有数据
+        if tab_id == 1 and fmt_str in ('B', 'D', 'W', 'M'):
+            t1, t2 = start.strftime(r'%Y-%m-%d'), end.strftime(r'%Y-%m-%d')
+            return [(t1, t2)]
 
-    def _datepicker(self, css, date_str):
-        """指定日期"""
-        elem = self.driver.find_element_by_css_selector(css)
-        elem.clear()
-        elem.send_keys(date_str, Keys.TAB)
+        ps = loop_period_by(start, end, freq, False)
 
-    def _view_message(self, p, level, start, end, s=''):
-        """构造显示信息"""
-        width = 30
-        if level is None:
-            item = ''
+        if fmt_str in ('B', 'D', 'W', 'M'):
+
+            def t1_fmt_func(x):
+                return x.strftime(r'%Y-%m-%d')
+
+            def t2_fmt_func(x):
+                return x.strftime(r'%Y-%m-%d')
+
+        elif fmt_str == 'Q':
+
+            def t1_fmt_func(x):
+                return x.year
+
+            def t2_fmt_func(x):
+                return x.quarter
+
+        elif fmt_str == 'Y':
+
+            def t1_fmt_func(x):
+                return x.year
+
+            def t2_fmt_func(x):
+                return None
         else:
-            item = self.config[level]['name']
-        if pd.api.types.is_number(start):
-            if pd.api.types.is_number(end):
-                msg = f'{start}年{end}季度'
-            else:
-                if end:
-                    msg = f'{start}年 ~ {end}'
-                else:
-                    msg = f'{start}年'
-        else:
-            if start:
-                msg = pd.Timestamp(start).strftime(r'%Y-%m-%d')
-                if end:
-                    msg += f" ~ {pd.Timestamp(end).strftime(r'%Y-%m-%d')}"
-                else:
-                    msg = f"{pd.Timestamp(start).strftime(r'%Y-%m-%d')} ~ {pd.Timestamp('today').strftime(r'%Y-%m-%d')}"
-            else:
-                msg = ''
-        left = f"{p}{item}"
-        return f"{left:{width}} {msg} {s}"
+            raise ValueError(f'目前不支持FREQ"{loop_str}"格式。')
+        return [(t1_fmt_func(p[0]), t2_fmt_func(p[1])) for p in ps]
 
-    def _log_info(self, p, level, start, end, s=''):
-        self.logger.info(self._view_message(p, level, start, end, s))
+    # def _read_data_by_period(self, start, end):
+    #     """划分区间读取数据"""
+    #     loop_str = self._current_period_type()
+    #     if loop_str is None:
+    #         return self._read_branch_data(None, None)
+    #     freq = loop_str[0]
+    #     fmt_str = loop_str[1]
+    #     tab_id = getattr(self, 'tab_id', '')
+    #     # 单个股票可以一次性查询期间所有数据
+    #     if tab_id == 1 and fmt_str in ('B', 'D', 'W', 'M'):
+    #         # 单个股票期间数据量小
+    #         # 对于单个股票期间数据无需循环，直接设置期间即可
+    #         t1, t2 = start.strftime(r'%Y-%m-%d'), end.strftime(r'%Y-%m-%d')
+    #         self.logger.info(f'{self.current_item:<20}  (时段 {t1} ~ {t2})')
+    #         data = self._read_branch_data(t1, t2)
+    #         return data
+
+    #     ps = loop_period_by(start, end, freq, False)
+
+    #     if fmt_str in ('B', 'D', 'W', 'M'):
+
+    #         def t1_fmt_func(x):
+    #             return x.strftime(r'%Y-%m-%d')
+
+    #         def t2_fmt_func(x):
+    #             return x.strftime(r'%Y-%m-%d')
+
+    #     elif fmt_str == 'Q':
+
+    #         def t1_fmt_func(x):
+    #             return x.year
+
+    #         def t2_fmt_func(x):
+    #             return x.quarter
+
+    #     elif fmt_str == 'Y':
+
+    #         def t1_fmt_func(x):
+    #             return x.year
+
+    #         def t2_fmt_func(x):
+    #             return None
+    #     else:
+    #         raise ValueError(f'请检查"{level}"周期频率，目前不支持"{loop_str}"格式。')
+    #     res = []
+    #     for s, e in ps:
+    #         t1, t2 = t1_fmt_func(s), t2_fmt_func(e)
+    #         self.logger.info(f'{self.current_item:<20}  时段 ({t1} ~ {t2})')
+    #         data = self._read_branch_data(t1, t2)
+    #         res.extend(data)
+    #     return res
+
+    def _read_data_by_period(self, start, end):
+        """划分区间读取数据"""
+        res = []
+        ps = self._internal_ps(start, end)
+        for t1, t2 in ps:
+            self.logger.info(f'{self.current_item:<20}  时段 ({t1} ~ {t2})')
+            data = self._read_branch_data(t1, t2)
+            res.extend(data)
+        return res
+
+    def reset(self):
+        """恢复至初始状态"""
+        self._ensure_init()
+        # 一般而言出现异常均有提示信息出现
+        try:
+            self.driver.switch_to.alert.dismiss()
+        except Exception:
+            pass
+        # 刷新浏览器
+        self.driver.refresh()
 
     def scroll(self, size):
         """
@@ -453,3 +281,10 @@ class SZXPage(object):
         h = self.driver.get_window_size()['height']
         js = f"var q=document.documentElement.scrollTop={int(size * h)}"
         self.driver.execute_script(js)
+
+    def _is_view(self, elem):
+        style = elem.get_attribute('style')
+        if 'none' in style:
+            return False
+        elif 'inline-block' in style:
+            return True
