@@ -124,7 +124,7 @@ class THS(object):
                 info['驱动事件'] = df.iat[i, 2]
                 res.append(info)
             logger.info(f"概念简介 {page:>4}/{num:>4} 行数{len(df):>4}")
-            # time.sleep(random.uniform(0.2, 0.5))
+            time.sleep(random.uniform(0.2, 0.5))
         return res
 
     def get_concept_info(self):

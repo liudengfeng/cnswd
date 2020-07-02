@@ -47,7 +47,7 @@ async def fetch_news(page=1):
         async with session.post(url, data=kwargs, headers=HEADERS) as r:
             # 解析结果
             res = await r.json()
-            dt = to_timestamp(res['time'])
+            # dt = to_timestamp(res['time'])
             # logger.info(f"Page {page:>5} : {res['msg']} time {dt}")
             data = res['data']['list']
             for item in data:

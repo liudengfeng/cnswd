@@ -53,7 +53,10 @@ def financial_data():
     s = time.time()
     codes = ' '.join(list(map(to_yahoo_ticker, codes)))
     stock = Ticker(codes)
-    data = retry_call(stock.get_modules, [ITEMS], tries=3, delay=3)
+    data = retry_call(stock.get_modules, [ITEMS],
+                      tries=3,
+                      delay=3,
+                      logger=logger)
     duration = time.time() - s
     logger.info(f'完成提取 耗时 {duration:.2f}秒')
     return data

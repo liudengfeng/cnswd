@@ -146,7 +146,10 @@ class SZXPage(object):
         if btn.is_displayed():
             btn.click()
         # 等待完全发送查询指令
-        retry_call(self._before_read, exceptions=(TimeoutException, ), tries=3)
+        retry_call(self._before_read,
+                   exceptions=(TimeoutException, ),
+                   tries=3,
+                   logger=self.logger)
         res = read_json_data(self)
         return res
 

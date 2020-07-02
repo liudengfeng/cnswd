@@ -56,7 +56,10 @@ def bacth_refresh(codes, timestamp):
     status = {}
     for code in codes:
         try:
-            df = retry_call(fetch_cjmx, [code, date_str], delay=0.3, tries=3)
+            df = retry_call(fetch_cjmx, [code, date_str],
+                            delay=0.3,
+                            tries=3,
+                            logger=logger)
             if not df.empty:
                 df = _wy_fix_data(df)
                 collection.insert_many(to_dict(df))

@@ -1,17 +1,17 @@
 """
 覆盖式更新
 
-同花顺网站禁止多进程提取数据
+同花顺网站对提取数据有限制
 
 刷新非常耗时
 """
 import re
 import time
-
+import random
 import pandas as pd
 import pymongo
 from retry.api import retry_call
-
+from selenium.common.exceptions import TimeoutException
 from ..mongodb import get_db
 from ..utils import is_trading_time, make_logger
 from ..websource.ths import THS
@@ -54,6 +54,7 @@ def _refresh(collection, api, infoes):
             d['更新时间'] = pd.Timestamp('now')
             update(old, d)
             api.logger.info(f"更新'{d['概念名称']}'")
+            time.sleep(random.uniform(0.2, 0.5))
 
 
 def refresh():
@@ -62,10 +63,18 @@ def refresh():
         return
     if collection.estimated_document_count() == 0:
         create_index(collection)
+    with THS() as api:
+        infoes = retry_call(api.get_gn_times,
+                            tries=3,
+                            delay=3,
+                            exceptions=(TimeoutException, ),
+                            logger=api.logger)
 
     def f():
         with THS() as api:
-            infoes = api.get_gn_times()
-            retry_call(_refresh, [collection, api, infoes], tries=3, delay=1)
+            retry_call(_refresh, [collection, api, infoes],
+                       tries=3,
+                       delay=1,
+                       logger=api.logger)
 
-    retry_call(f, tries=3)
+    retry_call(f, tries=3, delay=3, exceptions=(TimeoutException, ))

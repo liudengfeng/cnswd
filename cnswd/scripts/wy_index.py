@@ -57,6 +57,7 @@ def _one(code):
                     },
                     exceptions=(ConnectionError, ValueError),
                     delay=0.3,
+                    logger=logger,
                     tries=3)
     if df.empty:
         logger.info(f"指数代码 {code} 开始日期 {start_str} 数据为空")

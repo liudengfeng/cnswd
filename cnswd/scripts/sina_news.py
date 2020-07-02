@@ -50,7 +50,7 @@ def refresh(pages):
     if not id_:
         create_index(collection)
         pages = 10000
-    df = retry_call(fecth_news, [pages], tries=3)
+    df = retry_call(fecth_news, [pages], tries=3, logger=logger)
     df = ensure_dtypes(df, **col_dtypes)
     df = df.loc[df['序号'] > id_, :]
     if len(data):
