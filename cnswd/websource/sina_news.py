@@ -1,18 +1,15 @@
 """新浪24*7财经新闻
 """
 import time
-from concurrent.futures.thread import ThreadPoolExecutor
 from functools import partial
 import pandas as pd
 
 from .._seleniumwire import make_headless_browser
-from ..setting.constants import MAX_WORKER
 from ..utils import make_logger
 
 logger = make_logger('新浪财经新闻')
 
 TOPIC_MAPS = {
-    0: '全部',
     1: '宏观',
     2: '行业',
     3: '公司',
@@ -22,6 +19,7 @@ TOPIC_MAPS = {
     7: '央行',
     8: '其他',
     10: 'A股',
+    0: '全部', # 不能分类的，只在全部显示。为提前消息分类，将其放最后
 }
 
 COLUMNS = ['序号', '时间', '概要', '分类']
@@ -64,7 +62,7 @@ class Sina247News(object):
             elem = self.driver.find_element_by_css_selector(css)
             if elem.is_selected():
                 elem.click()
-                time.sleep(0.1)
+                # time.sleep(0.1)
         self._off = True
 
     def turn_off(self):
@@ -94,10 +92,7 @@ class Sina247News(object):
 
     def _get_topic_news(self, tag, times):
         """获取分类消息"""
-        if tag == 0:
-            url = self.base_url
-        else:
-            url = self.base_url + f"?tag={tag}"
+        url = self.base_url + f"?tag={tag}"
         self.driver.get(url)
         # 每个栏目都需要关闭
         self.turn_off()
@@ -106,24 +101,15 @@ class Sina247News(object):
             if (i + 1) % 100 == 0:
                 time.sleep(0.2)
             self.scrolling()
-            time.sleep(0.1)
+            time.sleep(0.2)
             logger.info(f'当前栏目：{TOPIC_MAPS[tag]:>6} 第{i+1:>4}页')
         # 滚动完成后，一次性读取div元素
         divs = self.driver.find_elements_by_css_selector(div_css)
-        return [self._parse(div, tag) for div in divs]
+        res = [self._parse(div, tag) for div in divs]
+        return res
 
-    def history_news(self, pages):
+    def yield_history_news(self, pages):
         """历史财经新闻(一次性)"""
-        func = partial(self._get_topic_news, times=pages)
-        with ThreadPoolExecutor(MAX_WORKER) as pool:
-            dfs = pool.map(func, TOPIC_MAPS.keys())
-        df = pd.concat(dfs, sort=True, ignore_index=True)
-        return df
-
-    def pipeout(self, pages):
-        """历史财经新闻（迭代输出）"""
-        # `全部`与分项重叠
         for tag in TOPIC_MAPS.keys():
-            # logger.info(f'当前栏目：{TOPIC_MAPS[tag]:>8}')
             res = self._get_topic_news(tag, pages)
             yield _to_dataframe(res)

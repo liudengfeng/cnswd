@@ -1,6 +1,6 @@
 import pymongo
 from retry.api import retry_call
-
+from pymongo.errors import DuplicateKeyError
 from ..mongodb import get_db
 from ..utils import ensure_dtypes
 from ..utils.db_utils import to_dict
@@ -37,12 +37,6 @@ def get_max_id(collection):
         return 0
 
 
-def fecth_news(pages):
-    with Sina247News() as api:
-        df = api.history_news(pages)
-    return df
-
-
 def refresh(pages):
     db = get_db()
     collection = db[collection_name]
@@ -51,22 +45,21 @@ def refresh(pages):
         create_index(collection)
         pages = 10000
         logger.info(f"初始设置页数：{pages}")
-    df = retry_call(fecth_news, [pages], tries=3, logger=logger)
-    df = ensure_dtypes(df, **col_dtypes)
-    # 尽量保留包含细分分类的记录
-    df.drop_duplicates('序号', inplace=True, keep='last')
-    df = df.loc[df['序号'] > id_, :]
-    if len(df):
-        data = to_dict(df)
-        collection.insert_many(data)
-        logger.info(f"插入 {df.shape[0]} 行")
+    count = 0
+    with Sina247News() as api:
+        for df in api.yield_history_news(pages):
+            df = ensure_dtypes(df, **col_dtypes)
+            docs = to_dict(df)
+            for doc in docs:
+                try:
+                    collection.insert_one(doc)
+                    count += 1
+                except DuplicateKeyError:
+                    pass
+    logger.info(f"新增 {count} 行")
 
 
 def create_index(collection):
     collection.create_index([("序号", -1)], unique=True, name='id_index')
+    # collection.create_index([("序号", -1)], name='id_index')
     collection.create_index([("时间", -1)], name='dt_index')
-    # 以下失败，改用 spacy 规则匹配实现搜索及标识
-    # collaction = pymongo.collation.Collation('zh')
-    # collection.create_index([("概要", "text")],
-    #                         name='text',
-    #                         collation=collaction)
