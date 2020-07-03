@@ -1,10 +1,12 @@
 """新浪24*7财经新闻
 """
 import time
-
+from concurrent.futures.thread import ThreadPoolExecutor
+from functools import partial
 import pandas as pd
 
 from .._seleniumwire import make_headless_browser
+from ..setting.constants import MAX_WORKER
 from ..utils import make_logger
 
 logger = make_logger('新浪财经新闻')
@@ -112,15 +114,10 @@ class Sina247News(object):
 
     def history_news(self, pages):
         """历史财经新闻(一次性)"""
-        # `全部`与分项重叠
-        dfs = []
-        for tag in TOPIC_MAPS.keys():
-            # logger.info(f'当前栏目：{TOPIC_MAPS[tag]}')
-            res = self._get_topic_news(tag, pages)
-            dfs.append(_to_dataframe(res))
+        func = partial(self._get_topic_news, times=pages)
+        with ThreadPoolExecutor(MAX_WORKER) as pool:
+            dfs = pool.map(func, TOPIC_MAPS.keys())
         df = pd.concat(dfs, sort=True, ignore_index=True)
-        # 尽量保留包含细分分类的记录
-        df.drop_duplicates('序号', inplace=True, keep='last')
         return df
 
     def pipeout(self, pages):

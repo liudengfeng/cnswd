@@ -50,10 +50,13 @@ def refresh(pages):
     if not id_:
         create_index(collection)
         pages = 10000
+        logger.info(f"初始设置页数：{pages}")
     df = retry_call(fecth_news, [pages], tries=3, logger=logger)
     df = ensure_dtypes(df, **col_dtypes)
+    # 尽量保留包含细分分类的记录
+    df.drop_duplicates('序号', inplace=True, keep='last')
     df = df.loc[df['序号'] > id_, :]
-    if len(data):
+    if len(df):
         data = to_dict(df)
         collection.insert_many(data)
         logger.info(f"插入 {df.shape[0]} 行")
