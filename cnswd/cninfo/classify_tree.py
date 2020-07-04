@@ -36,6 +36,35 @@ PLATE_MAPS = {
 }
 
 
+def parse_classify_bom(driver,
+                       nth,
+                       root_css_fmt=".classify-tree > li:nth-child({})"):
+    """解析第nth分类方式的基础信息
+
+    Args:
+        driver (driver): 无头浏览器
+        nth (int): 序号
+        root_css_fmt (str, optional): 分类css模板. Defaults to ".classify-tree > li:nth-child({})".
+
+    Returns:
+        list: list of dict
+    """
+    assert nth in range(1, 7)
+    root_css = root_css_fmt.format(nth)
+    root_tree = driver.find_element_by_css_selector(root_css)
+    tree = root_tree.find_elements_by_tag_name("span")
+    bom = []
+    for em in tree:
+        data_id = em.get_attribute('data-id')
+        if data_id:
+            doc = {
+                '分类编码': data_id,
+                '分类名称': em.get_attribute('data-name'),
+            }
+            bom.append(doc)
+    return sorted(bom, key=lambda x: x['分类编码'])
+
+
 def parse_classify_tree(driver,
                         nth,
                         root_css_fmt=".classify-tree > li:nth-child({})"):
@@ -94,7 +123,18 @@ class ClassifyTree(object):
         if self.driver is not None:
             self.driver.quit()
 
-    def get_classify_tree_bom(self):
+    @property
+    def classify_tree_bom(self):
+        """分类树BOM表"""
+        bom = []
+        for i in range(1, 7):
+            docs = parse_classify_bom(self.driver, i)
+            bom.extend(docs)
+            p = docs[0]['分类名称']
+            self.logger.info(f"{p}(共{len(docs)}项)")
+        return bom
+
+    def get_classify_tree(self):
         """获取分类树信息"""
         res = []
         for i in range(1, 7):
@@ -135,7 +175,7 @@ class ClassifyTree(object):
         Returns:
             list: list of dict
         """
-        classify_tree = self.get_classify_tree_bom()
+        classify_tree = self.get_classify_tree()
         func = self.get_stock_list
         # 添加分类项下的股票列表
         for doc in classify_tree:
