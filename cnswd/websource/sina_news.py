@@ -2,47 +2,39 @@
 """
 import time
 from functools import partial
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
 import pandas as pd
+from selenium.webdriver.support.ui import WebDriverWait
 
 from .._seleniumwire import make_headless_browser
+from ..setting.config import POLL_FREQUENCY, TIMEOUT
 from ..utils import make_logger
 
 logger = make_logger('新浪财经新闻')
 
 TOPIC_MAPS = {
-    1: '宏观',
-    2: '行业',
-    3: '公司',
-    4: '数据',
-    5: '市场',
-    6: '观点',
-    7: '央行',
-    8: '其他',
-    10: 'A股',
-    0: '全部',  # 不能分类的，只在全部显示。为提前消息分类，将其放最后
+    2: 'A股',
+    3: '宏观',
+    4: '行业',
+    5: '公司',
+    6: '数据',
+    7: '市场',
+    8: '观点',
+    9: '央行',
+    10: '其他',
+    1: '全部',  # 不能分类的，可能在全部显示。为提取消息分类，将其放最后
 }
 
 COLUMNS = ['序号', '时间', '概要', '分类']
 
 
-def _to_dataframe(data):
-    if len(data):
-        data = sorted(data, key=lambda item: item[0], reverse=True)
-        df = pd.DataFrame.from_records(data)
-        df['时间'] = df[1].astype(str) + ' ' + df[2]
-        df['时间'] = pd.to_datetime(df['时间'])
-        df.rename(columns={0: '序号', 3: '概要', 4: '分类'}, inplace=True)
-        df.drop(columns=[1, 2], inplace=True)
-        df.drop_duplicates(subset='序号', inplace=True)
-    else:
-        df = pd.DataFrame()
-    return df
-
-
 class Sina247News(object):
     def __init__(self):
+        logger.info("生成无头浏览器")
         self.base_url = 'http://finance.sina.com.cn/7x24/'
         self.driver = make_headless_browser()
+        self.wait = WebDriverWait(self.driver, TIMEOUT, POLL_FREQUENCY)
         self._off = False
 
     def __enter__(self):
@@ -73,32 +65,56 @@ class Sina247News(object):
         """解析单个消息内容"""
         # 编号、日期(20180901)、时间('22:31:44')、概要
         ps = div.find_elements_by_tag_name('p')
-        return (
-            div.get_attribute('data-id'),
-            div.get_attribute('data-time'),
-            ps[0].text,
-            ps[1].text,
-            TOPIC_MAPS[tag],
-        )
+        dt = div.get_attribute('data-time') + ' ' + ps[0].text
+        dt = pd.to_datetime(dt)
+        return {
+            '序号': int(div.get_attribute('data-id')),
+            '时间': dt,
+            '分类': TOPIC_MAPS[tag],
+            '概要': ps[1].text,
+        }
+
+    def _is_view(self, elem):
+        style = elem.get_attribute('style')
+        if 'none' in style:
+            return False
+        elif 'inline-block' in style:
+            return True
+
+    def _no_data(self):
+        css = '#liveList01_empty'
+        elem = self.driver.find_element_by_css_selector(css)
+        return elem.is_displayed()
+
+    def _wait_loading(self):
+        css = '#liveList01_loading'
+        locator = (By.CSS_SELECTOR, css)
+        m = EC.invisibility_of_element_located(locator)
+        self.wait.until(m, "加载消息超时")
 
     def _get_topic_news(self, tag, times):
         """获取分类消息"""
-        url = self.base_url + f"?tag={tag}"
+        url = self.base_url
         self.driver.get(url)
+        self.driver.implicitly_wait(0.3)
+        css = f'span.bd_topic:nth-child({tag}) > a:nth-child(1)'
+        elem = self.driver.find_element_by_css_selector(css)
+        elem.click()
         # 每个栏目都需要关闭
         self.turn_off()
         div_css = 'div.bd_i'
         for i in range(times):
             self.scrolling()
-            time.sleep(0.1)
+            self._wait_loading()
+            if self._no_data():
+                break
             logger.info(f'当前栏目：{TOPIC_MAPS[tag]:>6} 第{i+1:>4}页')
             # 滚动完成后，读取div元素
             divs = self.driver.find_elements_by_css_selector(div_css)[-20:]
-            res = [self._parse(div, tag) for div in divs]
-            yield res
+            docs = [self._parse(div, tag) for div in divs]
+            yield docs
 
     def yield_history_news(self, pages):
         """历史财经新闻(一次性)"""
         for tag in TOPIC_MAPS.keys():
-            for data in self._get_topic_news(tag, pages):
-                yield _to_dataframe(data)
+            yield from self._get_topic_news(tag, pages)
