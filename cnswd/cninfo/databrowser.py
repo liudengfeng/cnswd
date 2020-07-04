@@ -310,7 +310,7 @@ class AdvanceSearcher(DataBrowser):
         meta = self.get_level_meta_data(level)
         field_maps = meta['field_maps']
         # 当前数据项目中文名称
-        self.current_item = meta['api_name']
+        self.current_item = name = meta['api_name']
         self._before_query()
         data = self._read_data_by_period(start, end)
-        return cleaned_data(data, field_maps)
+        return cleaned_data(data, field_maps, name)

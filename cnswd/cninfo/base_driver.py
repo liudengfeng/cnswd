@@ -24,9 +24,6 @@ from .ops import (datepicker, get_nav_info, input_code,
                   element_text_change_to, navigate, parse_meta_data,
                   read_json_data, simulated_click, select_year, select_quarter)
 
-from .utils import cleaned_data
-# ssl 握手信息提示
-# warnings.filterwarnings('ignore')
 INTERVAL = 0.3
 
 custom_options = {

@@ -5,7 +5,9 @@ import re
 NUM_PAT = re.compile(r"([(]\d{1,}(,\d{1,})?[)])")
 
 
-def _rename(old):
+def _rename(old, name=None, fieldName=None):
+    if name == '财务指标行业排名' and fieldName == 'F003D':
+        return '报告年度'
     if old == '证券代码':
         return '股票代码'
     if old == '证券简称':
@@ -16,7 +18,9 @@ def _rename(old):
     return new
 
 
-def _convert_func(field_type):
+def _convert_func(field_type, name=None, fieldName=None):
+    if name == '财务指标行业排名' and fieldName == 'F003D':
+        return partial(pd.to_datetime, errors='coerce')
     type_ = NUM_PAT.sub('', field_type)
     type_ = type_.upper()
     if type_ in ('VARCHAR', 'CHAR'):
@@ -30,7 +34,7 @@ def _convert_func(field_type):
     raise ValueError(f"未定义类型'{type_}'")
 
 
-def cleaned_data(data, field_maps):
+def cleaned_data(data, field_maps, name=None):
     """清理后的数据
 
     Args:
@@ -41,11 +45,11 @@ def cleaned_data(data, field_maps):
         list: 整理后的数据
     """
     name_maps = {
-        d['fieldName']: _rename(d['fieldChineseName'])
+        d['fieldName']: _rename(d['fieldChineseName'], name, d['fieldName'])
         for d in field_maps
     }
     convert_maps = {
-        d['fieldName']: _convert_func(d['fieldType'])
+        d['fieldName']: _convert_func(d['fieldType'], name, d['fieldName'])
         for d in field_maps
     }
     return [{

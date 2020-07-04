@@ -126,7 +126,7 @@ def refresh_margin():
 
 
 def _refresh(coll, api, t1, t2):
-    """初始化数据搜索"""
+    """数据搜索"""
     name = coll.name
     docs = api.get_data(name, t1, t2)
     dt_field = CN_INFO_CONFIG[coll.name][1]
