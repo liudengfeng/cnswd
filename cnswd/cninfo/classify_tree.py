@@ -54,10 +54,12 @@ def parse_classify_bom(driver,
     root_tree = driver.find_element_by_css_selector(root_css)
     tree = root_tree.find_elements_by_tag_name("span")
     bom = []
-    for em in tree:
+    cate = tree[0].get_attribute('data-name')
+    for em in tree[1:]:
         data_id = em.get_attribute('data-id')
         if data_id:
             doc = {
+                '分类方式': cate,
                 '分类编码': data_id,
                 '分类名称': em.get_attribute('data-name'),
             }
@@ -123,16 +125,11 @@ class ClassifyTree(object):
         if self.driver is not None:
             self.driver.quit()
 
-    @property
-    def classify_tree_bom(self):
+    def yield_classify_tree_bom(self):
         """分类树BOM表"""
-        bom = []
         for i in range(1, 7):
             docs = parse_classify_bom(self.driver, i)
-            bom.extend(docs)
-            p = docs[0]['分类名称']
-            self.logger.info(f"{p}(共{len(docs)}项)")
-        return bom
+            yield docs
 
     def get_classify_tree(self):
         """获取分类树信息"""

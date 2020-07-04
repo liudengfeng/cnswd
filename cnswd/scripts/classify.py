@@ -20,8 +20,9 @@ def refresh():
         collection_name = '分类BOM'
         collection = db[collection_name]
         collection.drop()
-        docs = api.classify_tree_bom
-        collection.insert_many(docs)
+        for docs in api.yield_classify_tree_bom():
+            if len(docs):
+                collection.insert_many(docs)
 
     duration = time.time() - s
     api.logger.info(f"耗时{duration:.4f}秒")
