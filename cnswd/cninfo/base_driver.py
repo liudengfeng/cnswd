@@ -164,8 +164,9 @@ class SZXPage(object):
         if tab_id == 1 and fmt_str in ('B', 'D', 'W', 'M'):
             t1, t2 = start.strftime(r'%Y-%m-%d'), end.strftime(r'%Y-%m-%d')
             return [(t1, t2)]
-
-        ps = loop_period_by(start, end, freq, False)
+        # 对于财务类，即周期频率为Q，排除未来日期
+        ps = loop_period_by(start, end, freq, False) if freq != 'Q' else loop_period_by(
+            start, end, freq, True)
 
         if fmt_str in ('B', 'D', 'W', 'M'):
 
@@ -193,58 +194,6 @@ class SZXPage(object):
         else:
             raise ValueError(f'目前不支持FREQ"{loop_str}"格式。')
         return [(t1_fmt_func(p[0]), t2_fmt_func(p[1])) for p in ps]
-
-    # def _read_data_by_period(self, start, end):
-    #     """划分区间读取数据"""
-    #     loop_str = self._current_period_type()
-    #     if loop_str is None:
-    #         return self._read_branch_data(None, None)
-    #     freq = loop_str[0]
-    #     fmt_str = loop_str[1]
-    #     tab_id = getattr(self, 'tab_id', '')
-    #     # 单个股票可以一次性查询期间所有数据
-    #     if tab_id == 1 and fmt_str in ('B', 'D', 'W', 'M'):
-    #         # 单个股票期间数据量小
-    #         # 对于单个股票期间数据无需循环，直接设置期间即可
-    #         t1, t2 = start.strftime(r'%Y-%m-%d'), end.strftime(r'%Y-%m-%d')
-    #         self.logger.info(f'{self.current_item:<20}  (时段 {t1} ~ {t2})')
-    #         data = self._read_branch_data(t1, t2)
-    #         return data
-
-    #     ps = loop_period_by(start, end, freq, False)
-
-    #     if fmt_str in ('B', 'D', 'W', 'M'):
-
-    #         def t1_fmt_func(x):
-    #             return x.strftime(r'%Y-%m-%d')
-
-    #         def t2_fmt_func(x):
-    #             return x.strftime(r'%Y-%m-%d')
-
-    #     elif fmt_str == 'Q':
-
-    #         def t1_fmt_func(x):
-    #             return x.year
-
-    #         def t2_fmt_func(x):
-    #             return x.quarter
-
-    #     elif fmt_str == 'Y':
-
-    #         def t1_fmt_func(x):
-    #             return x.year
-
-    #         def t2_fmt_func(x):
-    #             return None
-    #     else:
-    #         raise ValueError(f'请检查"{level}"周期频率，目前不支持"{loop_str}"格式。')
-    #     res = []
-    #     for s, e in ps:
-    #         t1, t2 = t1_fmt_func(s), t2_fmt_func(e)
-    #         self.logger.info(f'{self.current_item:<20}  时段 ({t1} ~ {t2})')
-    #         data = self._read_branch_data(t1, t2)
-    #         res.extend(data)
-    #     return res
 
     def _read_data_by_period(self, start, end):
         """划分区间读取数据"""
