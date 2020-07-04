@@ -46,13 +46,13 @@ class SZXPage(object):
     api_name = ''
     api_ename = ''
     query_btn_css = ''
+    delay = 0
 
     def __init__(self):
         self.driver = None
         self.logger = make_logger(self.api_name)
         self.logger.info("生成无头浏览器")
         self._meta_data = {}
-        delay = 0
 
     def __enter__(self):
         return self
