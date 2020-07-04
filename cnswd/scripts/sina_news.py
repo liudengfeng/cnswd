@@ -43,20 +43,20 @@ def refresh(pages):
     id_ = get_max_id(collection)
     if not id_:
         create_index(collection)
-        pages = 10000
+        pages = 10
         logger.info(f"初始设置页数：{pages}")
-    count = 0
     with Sina247News() as api:
         for df in api.yield_history_news(pages):
             df = ensure_dtypes(df, **col_dtypes)
             docs = to_dict(df)
+            count = 0
             for doc in docs:
                 try:
                     collection.insert_one(doc)
                     count += 1
                 except DuplicateKeyError:
                     pass
-    logger.info(f"新增 {count} 行")
+            logger.info(f"新增 {count} 行")
 
 
 def create_index(collection):

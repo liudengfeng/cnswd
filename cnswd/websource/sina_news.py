@@ -19,7 +19,7 @@ TOPIC_MAPS = {
     7: '央行',
     8: '其他',
     10: 'A股',
-    0: '全部', # 不能分类的，只在全部显示。为提前消息分类，将其放最后
+    0: '全部',  # 不能分类的，只在全部显示。为提前消息分类，将其放最后
 }
 
 COLUMNS = ['序号', '时间', '概要', '分类']
@@ -62,7 +62,6 @@ class Sina247News(object):
             elem = self.driver.find_element_by_css_selector(css)
             if elem.is_selected():
                 elem.click()
-                # time.sleep(0.1)
         self._off = True
 
     def turn_off(self):
@@ -82,14 +81,6 @@ class Sina247News(object):
             TOPIC_MAPS[tag],
         )
 
-    @property
-    def live_data(self):
-        """最新消息，默认滚动三次"""
-        res = []
-        for tag in TOPIC_MAPS.keys():
-            res.extend(self._get_topic_news(tag, times=3))
-        return _to_dataframe(res)
-
     def _get_topic_news(self, tag, times):
         """获取分类消息"""
         url = self.base_url + f"?tag={tag}"
@@ -98,18 +89,16 @@ class Sina247News(object):
         self.turn_off()
         div_css = 'div.bd_i'
         for i in range(times):
-            if (i + 1) % 100 == 0:
-                time.sleep(0.2)
             self.scrolling()
-            time.sleep(0.2)
+            time.sleep(0.1)
             logger.info(f'当前栏目：{TOPIC_MAPS[tag]:>6} 第{i+1:>4}页')
-        # 滚动完成后，一次性读取div元素
-        divs = self.driver.find_elements_by_css_selector(div_css)
-        res = [self._parse(div, tag) for div in divs]
-        return res
+            # 滚动完成后，读取div元素
+            divs = self.driver.find_elements_by_css_selector(div_css)[-20:]
+            res = [self._parse(div, tag) for div in divs]
+            yield res
 
     def yield_history_news(self, pages):
         """历史财经新闻(一次性)"""
         for tag in TOPIC_MAPS.keys():
-            res = self._get_topic_news(tag, pages)
-            yield _to_dataframe(res)
+            for data in self._get_topic_news(tag, pages):
+                yield _to_dataframe(data)
