@@ -140,7 +140,7 @@ class ClassifyTree(object):
         # 添加分类项下的股票列表
         for doc in classify_tree:
             elem = doc.pop('elem')
-            data_id = doc['分类编码']
+            # data_id = doc['分类编码']
             try:
                 codes = retry_call(func, [elem],
                                    tries=3,
