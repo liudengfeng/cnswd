@@ -2,7 +2,7 @@ import pandas as pd
 from functools import partial
 import re
 
-NUM_PAT = re.compile(r"([(]\d{1,}(,\d{1,})?[)])")
+NUM_PAT = re.compile(r"([(]\d{1,}(,\d{1,})?[)]?)")
 
 
 def _rename(old, name=None, fieldName=None):
