@@ -1,0 +1,214 @@
+[
+  {
+    "key": "NetIncomeContinuousOperations",
+    "value": "净收入连续运营"
+  },
+  {
+    "key": "InterestIncome",
+    "value": "利息收入"
+  },
+  {
+    "key": "DilutedEPS",
+    "value": "稀释每股收益"
+  },
+  {
+    "key": "NetIncomeIncludingNoncontrollingInterests",
+    "value": "包括非控制性权益的净收入"
+  },
+  {
+    "key": "CostOfRevenue",
+    "value": "收益成本"
+  },
+  {
+    "key": "NormalizedEBITDA",
+    "value": "标准化EBITDA"
+  },
+  {
+    "key": "TotalRevenue",
+    "value": "总收入"
+  },
+  {
+    "key": "EBIT",
+    "value": "息税前利润"
+  },
+  {
+    "key": "PretaxIncome",
+    "value": "税前收入"
+  },
+  {
+    "key": "OtherNonOperatingIncomeExpenses",
+    "value": "其他非营业收入支出"
+  },
+  {
+    "key": "GeneralAndAdministrativeExpense",
+    "value": "一般及行政费用"
+  },
+  {
+    "key": "symbol",
+    "value": "符号"
+  },
+  {
+    "key": "TotalOperatingIncomeAsReported",
+    "value": "报告总营业收入"
+  },
+  {
+    "key": "ResearchAndDevelopment",
+    "value": "研究与开发"
+  },
+  {
+    "key": "NetIncomeFromContinuingAndDiscontinuedOperation",
+    "value": "持续经营和停止经营产生的净收入"
+  },
+  {
+    "key": "OperatingIncome",
+    "value": "营业收入"
+  },
+  {
+    "key": "TaxEffectOfUnusualItems",
+    "value": "异常项目的税收影响"
+  },
+  {
+    "key": "SellingAndMarketingExpense",
+    "value": "营销费用"
+  },
+  {
+    "key": "NetIncomeCommonStockholders",
+    "value": "净收入普通股股东"
+  },
+  {
+    "key": "NetNonOperatingInterestIncomeExpense",
+    "value": "净非营业利息收入支出"
+  },
+  {
+    "key": "TaxProvision",
+    "value": "税收规定"
+  },
+  {
+    "key": "SpecialIncomeCharges",
+    "value": "特殊收入费用"
+  },
+  {
+    "key": "DilutedAverageShares",
+    "value": "摊薄平均股"
+  },
+  {
+    "key": "OperatingRevenue",
+    "value": "营业收入"
+  },
+  {
+    "key": "ReconciledDepreciation",
+    "value": "对帐折旧"
+  },
+  {
+    "key": "GrossProfit",
+    "value": "毛利"
+  },
+  {
+    "key": "TaxRateForCalcs",
+    "value": "计算税率"
+  },
+  {
+    "key": "EBITDA",
+    "value": "息税折旧摊销前利润"
+  },
+  {
+    "key": "BasicEPS",
+    "value": "基本每股收益"
+  },
+  {
+    "key": "OtherOperatingExpenses",
+    "value": "其他营业费用"
+  },
+  {
+    "key": "NetInterestIncome",
+    "value": "净利息收入"
+  },
+  {
+    "key": "TotalUnusualItems",
+    "value": "异常物品总数"
+  },
+  {
+    "key": "BasicAverageShares",
+    "value": "基本平均股"
+  },
+  {
+    "key": "ReconciledCostOfRevenue",
+    "value": "对帐的收入成本"
+  },
+  {
+    "key": "NormalizedIncome",
+    "value": "归一化收入"
+  },
+  {
+    "key": "OtherSpecialCharges",
+    "value": "其他特殊费用"
+  },
+  {
+    "key": "NetIncomeFromContinuingOperationNetMinorityInterest",
+    "value": "持续经营净收入少数股东权益净额"
+  },
+  {
+    "key": "TotalUnusualItemsExcludingGoodwill",
+    "value": "排除商誉的异常项目总计"
+  },
+  {
+    "key": "TotalExpenses",
+    "value": "总费用"
+  },
+  {
+    "key": "InterestExpense",
+    "value": "利息花费"
+  },
+  {
+    "key": "periodType",
+    "value": "期间类型"
+  },
+  {
+    "key": "NetIncome",
+    "value": "净收入"
+  },
+  {
+    "key": "InterestExpenseNonOperating",
+    "value": "非营业利息支出"
+  },
+  {
+    "key": "TotalOtherFinanceCost",
+    "value": "其他财务费用合计"
+  },
+  {
+    "key": "InterestIncomeNonOperating",
+    "value": "非营业利息收入"
+  },
+  {
+    "key": "WriteOff",
+    "value": "注销"
+  },
+  {
+    "key": "GainOnSaleOfSecurity",
+    "value": "出售证券收益"
+  },
+  {
+    "key": "asOfDate",
+    "value": "截至日期"
+  },
+  {
+    "key": "MinorityInterests",
+    "value": "少数权益"
+  },
+  {
+    "key": "OperatingExpense",
+    "value": "运营开支"
+  },
+  {
+    "key": "OtherunderPreferredStockDividend",
+    "value": "优先股股息下的其他"
+  },
+  {
+    "key": "SellingGeneralAndAdministration",
+    "value": "销售总务和行政"
+  },
+  {
+    "key": "ImpairmentOfCapitalAssets",
+    "value": "资本资产减值"
+  }
+]

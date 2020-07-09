@@ -16,6 +16,7 @@ from ..scripts.trading_codes import read_all_stock_codes
 from ..setting.constants import MAX_WORKER
 from ..utils import batch_loop, make_logger
 from ..utils.db_utils import to_dict
+from .yahoo_utils import get_cname_maps
 
 logger = make_logger('雅虎财经')
 
@@ -39,10 +40,12 @@ def to_yahoo_ticker(code):
 
 
 @retry(ConnectionError, tries=3, delay=1, logger=logger)
-def _handle_df(stock):
+def _handle_df(stock, pbar):
     """添加模式"""
     db = get_db('yahoo')
     for item in ['balance_sheet', 'income_statement', 'cash_flow', 'valuation_measures']:
+        pbar.set_description(f"{item}")
+        maps = get_cname_maps(item)
         if item != 'valuation_measures':
             df = getattr(stock, item)('q')
         else:
@@ -53,18 +56,23 @@ def _handle_df(stock):
         df.reset_index(inplace=True)
         df['symbol'] = df['symbol'].map(lambda x: x.split('.')[0])
         collection = db[item]
-        create_index(item, 'symbol', 'asOfDate', 'periodType', True)
+        create_index(item, maps['symbol'],
+                     maps['asOfDate'], maps['periodType'], True)
         for doc in df.to_dict('records'):
+            to_add = {maps.get(k, k): v for k, v in doc.items()}
             try:
-                collection.insert_one(doc)
+                collection.insert_one(to_add)
             except DuplicateKeyError:
                 pass
 
 
 @retry(ConnectionError, tries=3, delay=1, logger=logger)
-def _handle_doc(stock):
+def _handle_doc(stock, pbar):
     db = get_db('yahoo')
     for item in ['financial_data', 'key_stats']:
+        pbar.set_description(f"{item}")
+        maps = get_cname_maps(item)
+        collection = db[item]
         records = getattr(stock, item)
         if 'error' in records.keys():
             raise ConnectionError(
@@ -72,10 +80,10 @@ def _handle_doc(stock):
         for symbol, doc in records.items():
             code = symbol.split('.')[0]
             if isinstance(doc, dict):
-                collection = db[item]
-                doc['symbol'] = code
-                doc['update_time'] = pd.Timestamp.now()
-                collection.insert_one(doc)
+                to_add = {maps.get(k, k): v for k, v in doc.items()}
+                to_add[maps['symbol']] = code
+                to_add['更新时间'] = pd.Timestamp.now()
+                collection.insert_one(to_add)
 
 
 def _max_ids():
@@ -90,6 +98,8 @@ def _max_ids():
             res[item] = None
     return res
 
+# 废弃
+
 
 def _delete_old(old_ids):
     db = get_db('yahoo')
@@ -102,23 +112,21 @@ def _delete_old(old_ids):
 
 
 def _refresh(codes):
-    for batch in tqdm(batch_loop(codes, 4*8)):
-        symbols = ','.join(list(map(to_yahoo_ticker, batch)))
-        stock = Ticker(symbols)  # , asynchronous=True, max_workers=MAX_WORKER)
-        try:
-            _handle_df(stock)
-            _handle_doc(stock)
-        except ConnectionError:
-            # 当三次尝试后，依旧存在异常，忽略
-            pass
-    return True
+    with tqdm(batch_loop(codes, 4*8)) as pbar:
+        for batch in pbar:
+            symbols = ','.join(list(map(to_yahoo_ticker, batch)))
+            stock = Ticker(symbols)
+            try:
+                _handle_df(stock, pbar)
+                _handle_doc(stock, pbar)
+            except ConnectionError:
+                # 当三次尝试后，依旧存在异常，忽略
+                pass
+        return True
 
 
 def refresh():
     codes = read_all_stock_codes()
     shuffle(codes)
     logger.info(f'股票总量 {len(codes)}')
-    # old_ids = _max_ids()
-    # if _refresh(codes):
-    #     _delete_old(old_ids)
     _refresh(codes)

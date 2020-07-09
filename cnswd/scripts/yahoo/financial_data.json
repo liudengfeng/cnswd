@@ -1,0 +1,122 @@
+[
+  {
+    "key": "targetHighPrice",
+    "value": "目标最高价"
+  },
+  {
+    "key": "revenueGrowth",
+    "value": "收入增长"
+  },
+  {
+    "key": "returnOnAssets",
+    "value": "资产收益率"
+  },
+  {
+    "key": "currentPrice",
+    "value": "目前的价格"
+  },
+  {
+    "key": "grossMargins",
+    "value": "毛利率"
+  },
+  {
+    "key": "symbol",
+    "value": "符号"
+  },
+  {
+    "key": "maxAge",
+    "value": "最高年龄"
+  },
+  {
+    "key": "ebitda",
+    "value": "税前利润"
+  },
+  {
+    "key": "ebitdaMargins",
+    "value": "息税折旧摊销前利润"
+  },
+  {
+    "key": "debtToEquity",
+    "value": "债权转股权"
+  },
+  {
+    "key": "profitMargins",
+    "value": "利润率"
+  },
+  {
+    "key": "targetMeanPrice",
+    "value": "目标均价"
+  },
+  {
+    "key": "returnOnEquity",
+    "value": "股本回报率"
+  },
+  {
+    "key": "totalRevenue",
+    "value": "总收入"
+  },
+  {
+    "key": "targetLowPrice",
+    "value": "目标最低价"
+  },
+  {
+    "key": "revenuePerShare",
+    "value": "每股收益"
+  },
+  {
+    "key": "financialCurrency",
+    "value": "金融货币"
+  },
+  {
+    "key": "grossProfits",
+    "value": "毛利"
+  },
+  {
+    "key": "operatingMargins",
+    "value": "营业利润率"
+  },
+  {
+    "key": "operatingCashflow",
+    "value": "经营性现金流"
+  },
+  {
+    "key": "quickRatio",
+    "value": "速动比率"
+  },
+  {
+    "key": "currentRatio",
+    "value": "目前的比例"
+  },
+  {
+    "key": "totalCash",
+    "value": "总现金"
+  },
+  {
+    "key": "numberOfAnalystOpinions",
+    "value": "分析师意见数量"
+  },
+  {
+    "key": "earningsGrowth",
+    "value": "盈利增长"
+  },
+  {
+    "key": "freeCashflow",
+    "value": "自由现金流"
+  },
+  {
+    "key": "targetMedianPrice",
+    "value": "目标中位数价格"
+  },
+  {
+    "key": "totalDebt",
+    "value": "总债务"
+  },
+  {
+    "key": "totalCashPerShare",
+    "value": "每股现金总额"
+  },
+  {
+    "key": "recommendationKey",
+    "value": "推荐关键字"
+  }
+]

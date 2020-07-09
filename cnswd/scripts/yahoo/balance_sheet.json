@@ -1,0 +1,366 @@
+[
+  {
+    "key": "AdditionalPaidInCapital",
+    "value": "资本的额外支付"
+  },
+  {
+    "key": "CashCashEquivalentsAndShortTermInvestments",
+    "value": "现金，现金等价物和短期投资"
+  },
+  {
+    "key": "OtherCurrentLiabilities",
+    "value": "其他流动负债"
+  },
+  {
+    "key": "TotalNonCurrentAssets",
+    "value": "非流动资产总计"
+  },
+  {
+    "key": "PensionandOtherPostRetirementBenefitPlansCurrent",
+    "value": "养老金和其他退休后福利计划"
+  },
+  {
+    "key": "OtherIntangibleAssets",
+    "value": "其他无形资产"
+  },
+  {
+    "key": "DerivativeProductLiabilities",
+    "value": "衍生产品责任"
+  },
+  {
+    "key": "GrossAccountsReceivable",
+    "value": "应收账款总额"
+  },
+  {
+    "key": "PreferredStock",
+    "value": "优先股"
+  },
+  {
+    "key": "TreasuryStock",
+    "value": "国库券"
+  },
+  {
+    "key": "FinishedGoods",
+    "value": "完成品"
+  },
+  {
+    "key": "InvestedCapital",
+    "value": "投入资金"
+  },
+  {
+    "key": "LongTermDebt",
+    "value": "长期债务"
+  },
+  {
+    "key": "NonCurrentDeferredRevenue",
+    "value": "非流动递延收益"
+  },
+  {
+    "key": "TotalDebt",
+    "value": "总债务"
+  },
+  {
+    "key": "HedgingAssetsCurrent",
+    "value": "对冲流动资产"
+  },
+  {
+    "key": "periodType",
+    "value": "期间类型"
+  },
+  {
+    "key": "AvailableForSaleSecurities",
+    "value": "可供出售证券"
+  },
+  {
+    "key": "InvestmentsAndAdvances",
+    "value": "投资与垫款"
+  },
+  {
+    "key": "InvestmentProperties",
+    "value": "投资物业"
+  },
+  {
+    "key": "MachineryFurnitureEquipment",
+    "value": "机械家具设备"
+  },
+  {
+    "key": "NetPPE",
+    "value": "净个人防护装备"
+  },
+  {
+    "key": "NetDebt",
+    "value": "净债务"
+  },
+  {
+    "key": "OtherPayable",
+    "value": "其他应付款"
+  },
+  {
+    "key": "asOfDate",
+    "value": "截至日期"
+  },
+  {
+    "key": "CurrentDebt",
+    "value": "流动债务"
+  },
+  {
+    "key": "NonCurrentDeferredTaxesLiabilities",
+    "value": "非流动递延税项负债"
+  },
+  {
+    "key": "GrossPPE",
+    "value": "个人防护装备"
+  },
+  {
+    "key": "LongTermCapitalLeaseObligation",
+    "value": "长期资本租赁义务"
+  },
+  {
+    "key": "TotalLiabilitiesNetMinorityInterest",
+    "value": "负债总额净少数股东权益"
+  },
+  {
+    "key": "OtherEquityInterest",
+    "value": "其他股权"
+  },
+  {
+    "key": "symbol",
+    "value": "符号"
+  },
+  {
+    "key": "DividendsPayable",
+    "value": "应付股利"
+  },
+  {
+    "key": "GoodwillAndOtherIntangibleAssets",
+    "value": "商誉和其他无形资产"
+  },
+  {
+    "key": "OtherReceivables",
+    "value": "其他应收款"
+  },
+  {
+    "key": "OtherShortTermInvestments",
+    "value": "其他短期投资"
+  },
+  {
+    "key": "TotalAssets",
+    "value": "总资产"
+  },
+  {
+    "key": "WorkInProcess",
+    "value": "在制品"
+  },
+  {
+    "key": "Payables",
+    "value": "应付款"
+  },
+  {
+    "key": "BuildingsAndImprovements",
+    "value": "建筑和改善"
+  },
+  {
+    "key": "LongTermDebtAndCapitalLeaseObligation",
+    "value": "长期债务和资本租赁义务"
+  },
+  {
+    "key": "MinorityInterest",
+    "value": "少数权益"
+  },
+  {
+    "key": "CashEquivalents",
+    "value": "现金等价物"
+  },
+  {
+    "key": "InvestmentinFinancialAssets",
+    "value": "金融资产投资"
+  },
+  {
+    "key": "Inventory",
+    "value": "库存"
+  },
+  {
+    "key": "LongTermEquityInvestment",
+    "value": "长期股权投资"
+  },
+  {
+    "key": "RawMaterials",
+    "value": "原料"
+  },
+  {
+    "key": "AccountsReceivable",
+    "value": "应收账款"
+  },
+  {
+    "key": "OtherInventories",
+    "value": "其他存货"
+  },
+  {
+    "key": "AccountsPayable",
+    "value": "应付账款"
+  },
+  {
+    "key": "NonCurrentPensionAndOtherPostretirementBenefitPlans",
+    "value": "非流动养恤金和其他退休后福利计划"
+  },
+  {
+    "key": "CashAndCashEquivalents",
+    "value": "现金及现金等价物"
+  },
+  {
+    "key": "TradingSecurities",
+    "value": "交易证券"
+  },
+  {
+    "key": "AssetsHeldForSaleCurrent",
+    "value": "持有待售资产"
+  },
+  {
+    "key": "HeldToMaturitySecurities",
+    "value": "持有至到期证券"
+  },
+  {
+    "key": "PreferredStockEquity",
+    "value": "优先股权益"
+  },
+  {
+    "key": "WorkingCapital",
+    "value": "营运资金"
+  },
+  {
+    "key": "OtherCurrentAssets",
+    "value": "其他流动资产"
+  },
+  {
+    "key": "CommonStock",
+    "value": "普通股"
+  },
+  {
+    "key": "Properties",
+    "value": "物产"
+  },
+  {
+    "key": "TradeandOtherPayablesNonCurrent",
+    "value": "贸易及其他应付款项非流动"
+  },
+  {
+    "key": "RetainedEarnings",
+    "value": "留存收益"
+  },
+  {
+    "key": "StockholdersEquity",
+    "value": "股东权益"
+  },
+  {
+    "key": "TotalEquityGrossMinorityInterest",
+    "value": "权益合计少数股东权益总额"
+  },
+  {
+    "key": "PrepaidAssets",
+    "value": "预付资产"
+  },
+  {
+    "key": "InventoriesAdjustmentsAllowances",
+    "value": "库存调整备抵"
+  },
+  {
+    "key": "TangibleBookValue",
+    "value": "有形账面价值"
+  },
+  {
+    "key": "ShareIssued",
+    "value": "发行股票"
+  },
+  {
+    "key": "LandAndImprovements",
+    "value": "土地与改良"
+  },
+  {
+    "key": "CurrentDebtAndCapitalLeaseObligation",
+    "value": "流动债务和资本租赁义务"
+  },
+  {
+    "key": "OtherNonCurrentAssets",
+    "value": "其他非流动资产"
+  },
+  {
+    "key": "TotalNonCurrentLiabilitiesNetMinorityInterest",
+    "value": "非流动负债合计净少数股东权益"
+  },
+  {
+    "key": "OtherNonCurrentLiabilities",
+    "value": "其他非流动负债"
+  },
+  {
+    "key": "NetTangibleAssets",
+    "value": "净有形资产"
+  },
+  {
+    "key": "Goodwill",
+    "value": "商誉"
+  },
+  {
+    "key": "CurrentLiabilities",
+    "value": "流动负债"
+  },
+  {
+    "key": "ConstructionInProgress",
+    "value": "在建工程"
+  },
+  {
+    "key": "CommonStockEquity",
+    "value": "普通股权益"
+  },
+  {
+    "key": "OtherProperties",
+    "value": "其他特性"
+  },
+  {
+    "key": "PreferredSecuritiesOutsideStockEquity",
+    "value": "股权以外的优先证券"
+  },
+  {
+    "key": "NonCurrentDeferredAssets",
+    "value": "非流动递延资产"
+  },
+  {
+    "key": "CapitalStock",
+    "value": "股本"
+  },
+  {
+    "key": "TotalTaxPayable",
+    "value": "应付税款总额"
+  },
+  {
+    "key": "CurrentAssets",
+    "value": "当前资产"
+  },
+  {
+    "key": "OrdinarySharesNumber",
+    "value": "普通股数"
+  },
+  {
+    "key": "CapitalLeaseObligations",
+    "value": "资本租赁义务"
+  },
+  {
+    "key": "AllowanceForDoubtfulAccountsReceivable",
+    "value": "呆账准备金"
+  },
+  {
+    "key": "CashFinancial",
+    "value": "现金金融"
+  },
+  {
+    "key": "TotalCapitalization",
+    "value": "总资本"
+  },
+  {
+    "key": "AccumulatedDepreciation",
+    "value": "累计折旧"
+  },
+  {
+    "key": "NonCurrentDeferredTaxesAssets",
+    "value": "非流动递延税项资产"
+  }
+]

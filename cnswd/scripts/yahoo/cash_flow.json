@@ -1,0 +1,94 @@
+[
+  {
+    "key": "ChangeInWorkingCapital",
+    "value": "营运资金变动"
+  },
+  {
+    "key": "ChangeInInventory",
+    "value": "库存变化"
+  },
+  {
+    "key": "RepaymentOfDebt",
+    "value": "偿还债务"
+  },
+  {
+    "key": "symbol",
+    "value": "符号"
+  },
+  {
+    "key": "NetOtherInvestingChanges",
+    "value": "净其他投资变动"
+  },
+  {
+    "key": "ChangeInCashSupplementalAsReported",
+    "value": "报告的补充现金变动"
+  },
+  {
+    "key": "OperatingCashFlow",
+    "value": "经营性现金流"
+  },
+  {
+    "key": "PurchaseOfInvestment",
+    "value": "投资支出"
+  },
+  {
+    "key": "EndCashPosition",
+    "value": "期末现金头寸"
+  },
+  {
+    "key": "BeginningCashPosition",
+    "value": "起始现金头寸"
+  },
+  {
+    "key": "DepreciationAndAmortization",
+    "value": "折旧及摊销"
+  },
+  {
+    "key": "PurchaseOfBusiness",
+    "value": "购买业务"
+  },
+  {
+    "key": "FreeCashFlow",
+    "value": "自由现金流"
+  },
+  {
+    "key": "periodType",
+    "value": "期间类型"
+  },
+  {
+    "key": "InvestingCashFlow",
+    "value": "投资现金流"
+  },
+  {
+    "key": "NetIncome",
+    "value": "净收入"
+  },
+  {
+    "key": "CashDividendsPaid",
+    "value": "支付的现金股利"
+  },
+  {
+    "key": "CapitalExpenditure",
+    "value": "资本支出"
+  },
+  {
+    "key": "asOfDate",
+    "value": "截至日期"
+  },
+  {
+    "key": "CommonStockIssuance",
+    "value": "普通股发行"
+  },
+  {
+    "key": "NetOtherFinancingCharges",
+    "value": "净其他融资费用"
+  },
+  {
+    "key": "SaleOfInvestment",
+    "value": "出售投资"
+  },
+  {
+    "key": "OtherNonCashItems",
+    "value": "其他非现金项目"
+  }
+]

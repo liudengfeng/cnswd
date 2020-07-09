@@ -1,0 +1,114 @@
+[
+  {
+    "key": "nextFiscalYearEnd",
+    "value": "下一个财政结束年度"
+  },
+  {
+    "key": "fundFamily",
+    "value": "基金组合"
+  },
+  {
+    "key": "SandWeekChange",
+    "value": "沙周变化"
+  },
+  {
+    "key": "trailingEps",
+    "value": "尾随每股收益"
+  },
+  {
+    "key": "WeekChange",
+    "value": "周变更"
+  },
+  {
+    "key": "sharesOutstanding",
+    "value": "流通股票"
+  },
+  {
+    "key": "symbol",
+    "value": "符号"
+  },
+  {
+    "key": "priceHint",
+    "value": "价格提示"
+  },
+  {
+    "key": "lastSplitDate",
+    "value": "最后送转日期"
+  },
+  {
+    "key": "heldPercentInstitutions",
+    "value": "机构持有百分比"
+  },
+  {
+    "key": "maxAge",
+    "value": "最高年龄"
+  },
+  {
+    "key": "category",
+    "value": "类别"
+  },
+  {
+    "key": "legalType",
+    "value": "合法类型"
+  },
+  {
+    "key": "lastSplitFactor",
+    "value": "最后送转因子"
+  },
+  {
+    "key": "profitMargins",
+    "value": "利润率"
+  },
+  {
+    "key": "floatShares",
+    "value": "流通股"
+  },
+  {
+    "key": "bookValue",
+    "value": "账面价值"
+  },
+  {
+    "key": "mostRecentQuarter",
+    "value": "最近季度"
+  },
+  {
+    "key": "enterpriseToRevenue",
+    "value": "企业收益"
+  },
+  {
+    "key": "earningsQuarterlyGrowth",
+    "value": "收益季度增长"
+  },
+  {
+    "key": "forwardEps",
+    "value": "预测Eps"
+  },
+  {
+    "key": "beta",
+    "value": "贝塔"
+  },
+  {
+    "key": "lastFiscalYearEnd",
+    "value": "上一个财政结束年度"
+  },
+  {
+    "key": "enterpriseValue",
+    "value": "企业价值"
+  },
+  {
+    "key": "enterpriseToEbitda",
+    "value": "企业价值与Ebitda之比"
+  },
+  {
+    "key": "heldPercentInsiders",
+    "value": "内部持有百分比"
+  },
+  {
+    "key": "priceToBook",
+    "value": "价格与账目价值之比"
+  },
+  {
+    "key": "netIncomeToCommon",
+    "value": "净收入与普通股之比"
+  }
+]

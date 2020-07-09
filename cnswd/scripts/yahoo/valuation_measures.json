@@ -1,0 +1,50 @@
+[
+  {
+    "key": "EnterpriseValue",
+    "value": "企业价值"
+  },
+  {
+    "key": "EnterprisesValueEBITDARatio",
+    "value": "企业价值EBITDA比率"
+  },
+  {
+    "key": "ForwardPeRatio",
+    "value": "预期市盈率"
+  },
+  {
+    "key": "EnterprisesValueRevenueRatio",
+    "value": "企业价值收益率"
+  },
+  {
+    "key": "periodType",
+    "value": "期间类型"
+  },
+  {
+    "key": "PeRatio",
+    "value": "PE比率"
+  },
+  {
+    "key": "PsRatio",
+    "value": "PS比率"
+  },
+  {
+    "key": "MarketCap",
+    "value": "市值"
+  },
+  {
+    "key": "PegRatio",
+    "value": "Peg比率"
+  },
+  {
+    "key": "asOfDate",
+    "value": "截至日期"
+  },
+  {
+    "key": "symbol",
+    "value": "符号"
+  },
+  {
+    "key": "PbRatio",
+    "value": "Pb比率"
+  }
+]
