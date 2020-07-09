@@ -3,6 +3,7 @@ from functools import partial
 import re
 
 NUM_PAT = re.compile(r"([(]\d{1,}(,\d{1,})?[)]?)")
+N_PAT = re.compile(r"F\d{3}N")
 
 
 def _rename(old, name=None, fieldName=None):
@@ -18,7 +19,41 @@ def _rename(old, name=None, fieldName=None):
     return new
 
 
+def _add_prefix(part_b):
+    maps = sorted(list(part_b), key=lambda x: x['fieldName'])
+    assert len(maps) % 3 == 0
+    res = {}
+    for i in range(len(maps) // 3):
+        prefix = maps[i*3]['fieldChineseName']
+        for j in range(3):
+            loc = i*3 + j
+            code = maps[loc]['fieldName']
+            cname = maps[loc]['fieldChineseName']
+            res[code] = f"{prefix}{cname}" if j != 0 else cname
+    return res
+
+
+def _get_field_name_maps(tname, field_maps):
+    if tname != '财务指标行业排名':
+        return {
+            d['fieldName']: _rename(
+                d['fieldChineseName'], tname, d['fieldName'])
+            for d in field_maps
+        }
+    else:
+        part_a = filter(lambda x: not N_PAT.match(x['fieldName']), field_maps)
+        part_b = filter(lambda x: N_PAT.match(x['fieldName']), field_maps)
+        res = {
+            d['fieldName']: _rename(
+                d['fieldChineseName'], tname, d['fieldName'])
+            for d in part_a
+        }
+        res.update(_add_prefix(part_b))
+        return res
+
+
 def _convert_func(field_type, name=None, fieldName=None):
+    # 将 `报告期` 统一为 `报告年度`
     if name == '财务指标行业排名' and fieldName == 'F003D':
         return partial(pd.to_datetime, errors='coerce')
     type_ = NUM_PAT.sub('', field_type)
@@ -44,10 +79,7 @@ def cleaned_data(data, field_maps, name=None):
     Returns:
         list: 整理后的数据
     """
-    name_maps = {
-        d['fieldName']: _rename(d['fieldChineseName'], name, d['fieldName'])
-        for d in field_maps
-    }
+    name_maps = _get_field_name_maps(name, field_maps)
     convert_maps = {
         d['fieldName']: _convert_func(d['fieldType'], name, d['fieldName'])
         for d in field_maps
