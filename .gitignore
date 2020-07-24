@@ -356,3 +356,4 @@ bats/
 pytest_report.html
 testing/t.py
 cnswd/cninfo_old/api.py
+cnswd/connect.py
