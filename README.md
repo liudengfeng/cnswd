@@ -36,8 +36,7 @@
 ## 存储
 根据数据变化特点，可分为动态与静态。静态数据采用覆盖式刷新，而动态数据则使用添加模式。
 
-数据一般以`h5`格式存储，含`df`与`record`二组。`record`记录状态，`df`保存数据。深证信数据在此基础上增加一层，变为`level/df`。`level_refresh_time`属性代表项目上一次刷新完成时间。`level/refresh_time`组记录代码初始化刷新时间。
-
+使用`mongodb`存储数据。部分查询时间长的**热**数据也可使用该程序存储。
 
 
 ## 安装及使用
@@ -45,6 +44,7 @@
 + 复制`geckodriver.exe`(`resources/tools`)到`c:\tools`
 + 复制国库券利率数据`*.xlsx`
 + 安装浏览器`Firefox`
++ `pip install https://github.com/liudengfeng/yahooquery/archive/2.2.4.tar.gz`
 ### 安装
 ```cmd
 pip install .

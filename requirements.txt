@@ -1,4 +1,4 @@
-yahooquery==2.2.4
+# yahooquery==2.2.4
 beautifulsoup4>=4.6.3
 bs4>=0.0.1
 Click>=7.0
