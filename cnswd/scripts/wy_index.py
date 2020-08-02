@@ -14,7 +14,7 @@ from ..setting.constants import MAIN_INDEX, MARKET_START, MAX_WORKER
 from ..utils import ensure_dtypes
 from ..utils.db_utils import to_dict
 from ..utils.log_utils import make_logger
-from ..websource.wy import fetch_history
+from ..websource.wy import fetch_history, get_index_base
 
 logger = make_logger('网易指数日线')
 db_name = "wy_index_daily"
@@ -73,7 +73,8 @@ def _one(code):
 
 def refresh():
     t = time.time()
-    codes = MAIN_INDEX.keys()
+    # codes = MAIN_INDEX.keys()
+    codes = get_index_base().to_dict()['name'].keys()
     for code in codes:
         try:
             _one(code)
