@@ -4,7 +4,7 @@
 import pandas as pd
 import os
 
-DB_HOST = '192.168.3.3'
+DB_HOST = '192.168.3.6'
 # 时区信息
 TZ = 'Asia/Shanghai'
 # 多进程最大数量
