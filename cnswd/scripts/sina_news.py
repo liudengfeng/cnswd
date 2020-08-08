@@ -37,7 +37,7 @@ def refresh(pages):
     id_ = get_max_id(collection)
     if id_ == 0:
         create_index(collection)
-        pages = 10000
+        pages = 2000
         logger.info(f"初始设置页数：{pages}")
     with Sina247News() as api:
         for docs in api.yield_history_news(pages):

@@ -34,7 +34,7 @@ class Sina247News(object):
         logger.info("生成无头浏览器")
         self.base_url = 'http://finance.sina.com.cn/7x24/'
         self.driver = make_headless_browser()
-        self.wait = WebDriverWait(self.driver, TIMEOUT, POLL_FREQUENCY)
+        self.wait = WebDriverWait(self.driver, 5, POLL_FREQUENCY)
         self._off = False
 
     def __enter__(self):
@@ -96,7 +96,7 @@ class Sina247News(object):
         """获取分类消息"""
         url = self.base_url
         self.driver.get(url)
-        self.driver.implicitly_wait(0.3)
+        self.driver.implicitly_wait(0.1)
         css = f'span.bd_topic:nth-child({tag}) > a:nth-child(1)'
         elem = self.driver.find_element_by_css_selector(css)
         elem.click()
