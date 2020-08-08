@@ -87,6 +87,6 @@ def _one(code):
 def refresh():
     t = time.time()
     codes = get_recent_trading_stocks()
-    with Pool(MAX_WORKER) as pool:
+    with Pool(1) as pool:
         list(pool.imap_unordered(_one, codes))
     logger.info(f"股票数量 {len(codes)}, 用时 {time.time() - t:.4f}秒")
