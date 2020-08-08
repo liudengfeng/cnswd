@@ -1,6 +1,6 @@
 import time
 from multiprocessing import Pool
-
+from random import shuffle
 import pandas as pd
 from retry.api import retry_call
 
@@ -10,6 +10,7 @@ from ..utils import ensure_dtypes, make_logger
 from ..utils.db_utils import to_dict
 from ..websource.tencent import get_recent_trading_stocks
 from ..websource.wy import fetch_history
+from .._exceptions import ConnectFailed
 
 logger = make_logger('网易股票日线')
 db_name = "wy_stock_daily"
@@ -68,7 +69,7 @@ def _one(code):
                         'code': code,
                         'start': start
                     },
-                    exceptions=(ConnectionError, ValueError),
+                    exceptions=(ConnectionError, ValueError, ConnectFailed),
                     delay=0.3,
                     logger=logger,
                     tries=3)
@@ -87,6 +88,9 @@ def _one(code):
 def refresh():
     t = time.time()
     codes = get_recent_trading_stocks()
-    with Pool(MAX_WORKER) as pool:
-        list(pool.imap_unordered(_one, codes))
+    shuffle(codes)
+    for _ in range(3):
+        with Pool(MAX_WORKER) as pool:
+            list(pool.imap_unordered(_one, codes))
+        time.sleep(1)
     logger.info(f"股票数量 {len(codes)}, 用时 {time.time() - t:.4f}秒")
