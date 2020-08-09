@@ -18,6 +18,7 @@ from .ops import (datepicker, element_attribute_change_to,
 from .utils import cleaned_data
 
 LEVEL_PAT = re.compile(r"\d{1,3}|[a-z]\d[a-z1-9]")
+PAGE_PAT = re.compile("共(.*?)条")
 
 
 def level_like(x):
@@ -33,7 +34,7 @@ class DataBrowser(SZXPage):
     api_ename = 'dataBrowse'
     query_btn_css = '.stock-search'
     delay = 0
-
+  
     def nav_tab(self, nth):
         """选择快速搜索或高级搜索
 
@@ -128,6 +129,12 @@ class DataBrowser(SZXPage):
         locator = (By.CSS_SELECTOR, css)
         self.wait.until(
             element_attribute_change_to(locator, 'style', 'display: none;'))
+        page_css = '.pagination-info'
+        page_elem = self.driver.find_element_by_css_selector(page_css)
+        if page_elem.is_displayed():
+            text = page_elem.text
+            page = int(PAGE_PAT.findall(text)[0])
+            self.logger.info(f"网页数据{page:5} 条记录")
 
 
 class FastSearcher(DataBrowser):
@@ -207,6 +214,7 @@ class AdvanceSearcher(DataBrowser):
                 data_param = api_elem.get_attribute('data-param')
                 data_path = f"{data_api}?{data_param}"
                 request = find_request(self, data_path)
+                request = self.driver.wait_for_request(request.path)
                 data = parse_response(self, request)
                 num = len(data)
                 nums[data_id] = num
@@ -242,9 +250,6 @@ class AdvanceSearcher(DataBrowser):
             num = self._nums[data_id]
             text = str(num)
             self.wait.until(element_text_change_to(locator, text))
-            # sleep = random.uniform(0.0, num / 2000)
-            # self.driver.implicitly_wait(sleep)
-            # self.driver.save_screenshot(f"{data_id}.png")
             # 仅当数量不为0时执行添加
             if self._nums[data_id]:
                 # 全部添加
@@ -275,8 +280,8 @@ class AdvanceSearcher(DataBrowser):
         """执行查询前应完成的动作"""
         # 高级搜索需要加载全部代码、全选擦查询字段
         self._load_all_code()
-        chech_css = '.detail-cont-bottom > div:nth-child(3) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
-        num = int(self.driver.find_element_by_css_selector(chech_css).text)
+        check_css = '.detail-cont-bottom > div:nth-child(3) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
+        num = int(self.driver.find_element_by_css_selector(check_css).text)
         # 只有非0时才需要全选字段
         if not num:
             self._select_all_fields()

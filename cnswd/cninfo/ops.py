@@ -88,7 +88,10 @@ def navigate(self, level):
 def find_by_id(self, data_id):
     """快速定位分类元素"""
     # 注意:data-id可能重复，并非唯一
-    return self.driver.find_element(By.XPATH, f"//a[@data-id='{data_id}']")
+    xpath = f"//a[@data-id='{data_id}']"
+    # locator = (By.XPATH, xpath)
+    # element = self.wait.until(EC.element_to_be_clickable(locator))
+    return self.driver.find_element_by_xpath(xpath)
 
 
 # endregion
@@ -135,7 +138,6 @@ def datepicker(self, date_str, css):
     elem.send_keys(date_str, Keys.TAB)
 
 
-# TODO:检验有效性
 def select_year(self, year, id_name='se1'):
     # css = f'#{id_name}_sele'
     # elem = self.driver.find_element_by_css_selector(css)
@@ -159,13 +161,13 @@ def select_quarter(self, q, css='.condition2 > select:nth-child(2)'):
 
 # region 解析数据
 def find_data_requests(self):
-    requests = []
+    requests = {}
     api_path = self.get_level_meta_data(self.current_level)['api_path']
     api_key = api_path.replace("http://webapi.cninfo.com.cn", '')
     for r in self.driver.requests:
         if r.method == 'POST' and api_key in r.path:
-            requests.append(r)
-    return requests
+            requests[r.url] = r
+    return requests.values()
 
 
 def find_request(self, path):
@@ -200,11 +202,10 @@ def parse_response(self, request):
     Returns:
         list: 数据字典列表
     """
-    r = self.driver.wait_for_request(request.path)
-    response = r.response
+    response = request.response
     res = []  # 默认为空
     if response.status_code == 200:
-        body = r._client.get_response_body(r.id)
+        body = request._client.get_response_body(request.id)
         data = json.loads(body)
         # 解析结果 402 不合法的参数
         if data['resultcode'] == 200:
