@@ -129,12 +129,14 @@ class DataBrowser(SZXPage):
         locator = (By.CSS_SELECTOR, css)
         self.wait.until(
             element_attribute_change_to(locator, 'style', 'display: none;'))
+        # self.wait.until(
+        #     element_attribute_change_to(locator, 'style', 'display: inline;'))
         page_css = '.pagination-info'
         page_elem = self.driver.find_element_by_css_selector(page_css)
         if page_elem.is_displayed():
             text = page_elem.text
             page = int(PAGE_PAT.findall(text)[0])
-            self.logger.info(f"网页数据{page:5} 条记录")
+            self.logger.info(f"已加载数据{page:5} 条记录【可能少于实际解析，以解析为准】")
 
 
 class FastSearcher(DataBrowser):

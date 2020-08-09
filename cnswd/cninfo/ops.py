@@ -204,6 +204,8 @@ def parse_response(self, request):
     """
     response = request.response
     res = []  # 默认为空
+    if response is None:
+        return res
     if response.status_code == 200:
         body = request._client.get_response_body(request.id)
         data = json.loads(body)
