@@ -16,7 +16,7 @@ def _refresh(db, name, api):
         meta = api.get_level_meta_data(level)
         meta['更新时间'] = pd.Timestamp('now')
         collection.insert_one(meta)
-        api.logger.info(f"写入项目 {info['名称']} 元素据")
+        api.logger.info(f"写入项目 {info['名称']} 元数据")
     api.driver.quit()
 
 
