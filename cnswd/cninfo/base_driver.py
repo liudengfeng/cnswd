@@ -20,7 +20,7 @@ from ..setting.config import POLL_FREQUENCY, TIMEOUT
 from ..utils import make_logger
 from ..utils.loop_utils import batch_loop, loop_period_by
 from .ops import (datepicker, get_nav_info, input_code,
-                  element_attribute_change_to, parse_path_response, find_by_id,
+                  element_attribute_change_to, parse_response, find_by_id,
                   element_text_change_to, navigate, parse_meta_data,
                   read_json_data, simulated_click, select_year, select_quarter)
 

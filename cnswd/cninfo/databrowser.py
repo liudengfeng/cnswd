@@ -13,8 +13,8 @@ from ..utils import sanitize_dates
 from .base_driver import INTERVAL, SZXPage
 from .ops import (datepicker, element_attribute_change_to,
                   element_text_change_to, find_by_id, input_code,
-                  parse_path_response, select_quarter, select_year,
-                  simulated_click)
+                  parse_response, select_quarter, select_year,
+                  simulated_click, find_request)
 from .utils import cleaned_data
 
 LEVEL_PAT = re.compile(r"\d{1,3}|[a-z]\d[a-z1-9]")
@@ -199,20 +199,22 @@ class AdvanceSearcher(DataBrowser):
             data_ids = ['101', '102', '107', '108', '110', '106', '109']
             for data_id in data_ids:
                 api_elem = find_by_id(self, data_id)
+                # 直接使用模拟点击，简化操作
+                simulated_click(self, api_elem)
+                self.driver.implicitly_wait(INTERVAL)
                 data_name = api_elem.get_attribute('data-name')
                 data_api = api_elem.get_attribute('data-api')
                 data_param = api_elem.get_attribute('data-param')
                 data_path = f"{data_api}?{data_param}"
-                # 直接使用模拟点击，简化操作
-                simulated_click(self, api_elem)
-                self.driver.implicitly_wait(INTERVAL)
-                data = parse_path_response(self, data_path)
+                request = find_request(self, data_path)
+                data = parse_response(self, request)
                 num = len(data)
                 nums[data_id] = num
                 self.logger.info(f"{data_name}(股票数量：{num})")
                 if num:
                     codes.update({d['SECCODE']: d['SECNAME'] for d in data})
-                # del self.driver.requests
+                # 删除请求
+                del self.driver.requests
             self._nums = nums
             self._codes = codes
         return self._codes
@@ -223,7 +225,7 @@ class AdvanceSearcher(DataBrowser):
         if code_loaded:
             return
         # 调用属性，确保生成数量字典
-        codes = self.stocks_in_trading
+        _ = self.stocks_in_trading
         add_label_css = '.cont-top-right > div:nth-child(1) > div:nth-child(1) > label:nth-child(1) > i:nth-child(2)'
         add_btn_css = '.cont-top-right > div:nth-child(2) > div:nth-child(1) > button:nth-child(1)'
         check_css = '.cont-top-right > div:nth-child(1) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
@@ -231,8 +233,8 @@ class AdvanceSearcher(DataBrowser):
         data_ids = ['101', '102', '107', '108', '110', '106', '109']
         for data_id in data_ids:
             api_elem = find_by_id(self, data_id)
-            data_name = api_elem.get_attribute('data-name')
-            data_api = api_elem.get_attribute('data-api')
+            # data_name = api_elem.get_attribute('data-name')
+            # data_api = api_elem.get_attribute('data-api')
             # 直接使用模拟点击，简化操作
             simulated_click(self, api_elem)
             # 模拟点击后务必预留时间

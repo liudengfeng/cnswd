@@ -158,32 +158,31 @@ def select_quarter(self, q, css='.condition2 > select:nth-child(2)'):
 
 
 # region 解析数据
-def get_api_paths(self):
-    paths = []
+def find_data_requests(self):
+    requests = []
     api_path = self.get_level_meta_data(self.current_level)['api_path']
-    api_key = api_path.replace("http://webapi.cninfo.com.cn/", '')
+    api_key = api_path.replace("http://webapi.cninfo.com.cn", '')
     for r in self.driver.requests:
         if r.method == 'POST' and api_key in r.path:
-            paths.append(r.path)
-    return paths
+            requests.append(r)
+    return requests
+
+
+def find_request(self, path):
+    for r in self.driver.requests:
+        if r.method == 'POST' and path in r.url:
+            return r
 
 
 def parse_meta_data(self):
     """解析元数据"""
     meta = {}
-    path = f'api-cloud-platform/apiinfo/info?id={self.current_data_id}'
-    request = retry_call(
-        self.driver.wait_for_request,
-        [path],
-        {'timeout': TIMEOUT},
-        exceptions=(TimeoutException, ),
-        delay=0.1,
-        tries=3,
-        logger=self.logger,
-    )
+    path = f'/api-cloud-platform/apiinfo/info?id={self.current_data_id}'
+    request = find_request(self, path)
     response = request.response
     if response.status_code == 200:
-        json_data = json.loads(response.body)
+        body = request._client.get_response_body(request.id)
+        json_data = json.loads(body)
         if json_data['msg'] == 'success':
             data = json_data['data']
             meta['api_level'] = self.api_level
@@ -195,28 +194,18 @@ def parse_meta_data(self):
     return meta
 
 
-def parse_path_response(self, path):
-    """解析指定路径的响应数据
-
-    Args:
-        path (str): 查询路径
+def parse_response(self, request):
+    """解析指定请求的响应数据
 
     Returns:
         list: 数据字典列表
     """
-    request = retry_call(
-        self.driver.wait_for_request,
-        [path],
-        {'timeout': TIMEOUT},
-        exceptions=(TimeoutException, ),
-        delay=0.1,
-        tries=3,
-        logger=self.logger,
-    )
-    response = request.response
+    r = self.driver.wait_for_request(request.path)
+    response = r.response
     res = []  # 默认为空
     if response.status_code == 200:
-        data = json.loads(response.body)
+        body = r._client.get_response_body(r.id)
+        data = json.loads(body)
         # 解析结果 402 不合法的参数
         if data['resultcode'] == 200:
             # 记录列表
@@ -227,9 +216,9 @@ def parse_path_response(self, path):
 def read_json_data(self):
     """解析查询数据"""
     data = []
-    paths = get_api_paths(self)
-    for path in sorted(paths):
-        data.extend(parse_path_response(self, path))
+    requests = find_data_requests(self)
+    for r in requests:
+        data.extend(parse_response(self, r))
     # 删除已经读取的请求
     del self.driver.requests
     return data
@@ -242,6 +231,7 @@ def read_json_data(self):
 class element_text_change_to(object):
     """期望元素文本改变为指定文本
     """
+
     def __init__(self, locator, text):
         """
         Arguments:
@@ -260,6 +250,7 @@ class element_text_change_to(object):
 class element_attribute_change_to(object):
     """期望元素属性更改为指定值
     """
+
     def __init__(self, locator, name, attribute):
         """
         Arguments:

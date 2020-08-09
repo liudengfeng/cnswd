@@ -29,9 +29,6 @@ wire_logger = logging.getLogger('seleniumwire')
 wire_logger.setLevel(logging.CRITICAL)
 
 
-# TODO:使用selenium可以正常使用蓝灯访问外网 但seleniumwire不行
-# 同时经常出现积极拒绝，怀疑其openssl.exe版本没有升级的问题?
-# 使用蓝灯代理，下载国内数据不受影响
 def make_headless_browser(custom_options={}):
     """无头浏览器"""
     # 使用系统代理
