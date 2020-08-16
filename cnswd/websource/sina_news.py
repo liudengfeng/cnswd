@@ -114,6 +114,7 @@ class Sina247News(object):
         with ThreadPoolExecutor(MAX_WORKER) as pool:
             docs = pool.map(func, divs)
         logger.info('完成解析')
+        del divs
         return list(docs)
 
     def yield_history_news(self, pages):
