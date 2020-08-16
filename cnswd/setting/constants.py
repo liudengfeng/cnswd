@@ -3,7 +3,14 @@
 """
 import pandas as pd
 import os
-
+# 如需局域网内访问，修改为本机IP地址
+# 且需要将 文件 mongod.cfg 中 bindIp 修改为 0.0.0.0
+# network interfaces
+# >>> net:
+# >>>  port: 27017
+# >>>  bindIp: 127.0.0.1, <本机地址>
+# 文件通常位于 C:\Program Files\MongoDB\Server\4.4\bin
+# 重启mongdb服务
 DB_HOST = '192.168.3.6'  # 如仅仅本机使用 修改为：'localhost'
 # 时区信息
 TZ = 'Asia/Shanghai'
