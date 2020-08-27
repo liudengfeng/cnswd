@@ -7,3 +7,4 @@ from .pd_utils import safety_exists_pkl, ensure_dtypes
 from .proc_utils import kill_firefox, before_refresh
 from .temp_utils import remove_temp_files
 from .tools import ensure_list, get_exchange_from_code
+from .cache import HotDataCache
