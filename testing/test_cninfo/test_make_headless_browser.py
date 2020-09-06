@@ -1,4 +1,4 @@
-from cnswd._selenium import make_headless_browser
+from cnswd._seleniumwire import make_headless_browser
 import pytest
 
 
