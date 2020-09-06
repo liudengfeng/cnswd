@@ -10,7 +10,9 @@ def test_full_years(end_year=2019):
     """测试年份是否完整"""
     actual = []
     for p in sorted(DATA_DIR.glob('*.xlsx')):
-        actual.append(int(p.name[:4]))
+        y = int(p.name[:4])
+        if y <= end_year:
+            actual.append(y)
     expected = [y for y in range(2002, end_year+1)]
     assert actual == expected
 

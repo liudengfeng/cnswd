@@ -11,5 +11,5 @@ def test_fetch_data(ts_api, level, start, end):
     data = ts_api.get_data(level, start, end)
     assert len(data) == num * t_days
     df = pd.DataFrame.from_dict(data)
-    assert df.shape == (1688 * t_days, 9)
+    assert df.shape == (num * t_days, 9)
     assert len(df['交易日期'].unique()) == t_days
