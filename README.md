@@ -47,6 +47,7 @@
 + `pip install https://github.com/liudengfeng/yahooquery/archive/2.2.4.tar.gz`
 ### 安装
 ```cmd
+pip install -r req_dev.txt
 pip install .
 
 # 开发模式
