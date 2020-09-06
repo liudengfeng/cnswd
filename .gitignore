@@ -353,7 +353,8 @@ cnswd.egg-info/
 .vscode/
 .pytest_cache/
 bats/
-pytest_report.html
+report.html
 testing/t.py
 cnswd/cninfo_old/api.py
 cnswd/connect.py
+.venv/
