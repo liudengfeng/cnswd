@@ -234,15 +234,13 @@ class AdvanceSearcher(DataBrowser):
             return
         # 调用属性，确保生成数量字典
         _ = self.stocks_in_trading
-        add_label_css = '.cont-top-right > div:nth-child(1) > div:nth-child(1) > label:nth-child(1) > i:nth-child(2)'
-        add_btn_css = '.cont-top-right > div:nth-child(2) > div:nth-child(1) > button:nth-child(1)'
-        check_css = '.cont-top-right > div:nth-child(1) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
-        locator = (By.CSS_SELECTOR, check_css)
+        chose_all_css = '.cont-top-right > div:nth-child(1) > div:nth-child(1) > label:nth-child(1)'
+        add_btn_css = '.cont-top-right > div:nth-child(2) > button:nth-child(1)'
+        num_check_css = '.cont-top-right > div:nth-child(1) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
+        locator = (By.CSS_SELECTOR, num_check_css)
         data_ids = ['101', '102', '107', '108', '110', '106', '109']
         for data_id in data_ids:
             api_elem = find_by_id(self, data_id)
-            # data_name = api_elem.get_attribute('data-name')
-            # data_api = api_elem.get_attribute('data-api')
             # 直接使用模拟点击，简化操作
             simulated_click(self, api_elem)
             # 模拟点击后务必预留时间
@@ -253,19 +251,17 @@ class AdvanceSearcher(DataBrowser):
             # 仅当数量不为0时执行添加
             if self._nums[data_id]:
                 # 全部添加
-                self._add_or_delete_all(add_label_css, add_btn_css)
-        total_css = '.cont-top-right > div:nth-child(3) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
-        actual = int(self.driver.find_element_by_css_selector(total_css).text)
+                self._add_or_delete_all(chose_all_css, add_btn_css)
+        selectedcount_css = '.cont-top-right > div:nth-child(3) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
+        actual = int(self.driver.find_element_by_css_selector(selectedcount_css).text)
         expected = sum(self._nums.values())
         assert actual == expected, f"股票总数应为：{expected}，实际：{actual}"
         self._code_loaded = True
 
     def _select_all_fields(self):
         """全选字段"""
-        # 使用i元素
-        # label_css = '.detail-cont-bottom > div:nth-child(1) > div:nth-child(1) > label:nth-child(1)'
-        label_css = '.detail-cont-bottom > div:nth-child(1) > div:nth-child(1) > label:nth-child(1) > i:nth-child(2)'
-        btn_css = '.detail-cont-bottom > div:nth-child(2) > div:nth-child(1) > button:nth-child(1)'
+        label_css = '.detail-cont-bottom > div:nth-child(1) > div:nth-child(1) > label:nth-child(1)'
+        btn_css = '.detail-cont-bottom > div:nth-child(2) > button:nth-child(1)'
         # 全选数据字段
         self._add_or_delete_all(label_css, btn_css)
 
