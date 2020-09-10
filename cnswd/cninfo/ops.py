@@ -2,7 +2,7 @@ import json
 import random
 import re
 import time
-
+from retry import retry
 from retry.api import retry_call
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
@@ -176,11 +176,17 @@ def find_request(self, path):
             return r
 
 
+def find_info_request(self):
+    for r in self.driver.requests:
+        if r.method == 'GET' and 'info?gatewayCode' in r.url:
+            return r
+
+
+@retry(AttributeError, tries=3, delay=1)
 def parse_meta_data(self):
     """解析元数据"""
     meta = {}
-    path = f'/api-cloud-platform/apiinfo/info?id={self.current_data_id}'
-    request = find_request(self, path)
+    request = find_info_request(self)
     response = request.response
     if response.status_code == 200:
         body = request._client.get_response_body(request.id)
@@ -188,11 +194,14 @@ def parse_meta_data(self):
         if json_data['msg'] == 'success':
             data = json_data['data']
             meta['api_level'] = self.api_level
-            meta['api_name'] = data['alias']
-            meta['apiId'] = data['apiId']
-            meta['api_path'] = data['fullUrl']
-            meta['inputParameter'] = json.loads(data['inputParameter'])
-            meta['field_maps'] = json.loads(data['outputParameter'])
+            meta['api_name'] = data['baseInfo']['alias']
+            meta['apiId'] = data['baseInfo']['name']
+            meta['api_path'] = data['requestConfig']['requestPath']
+            meta['inputParameter'] = data['requestConfig']['inputParameter']
+            meta['field_maps'] = json.loads(
+                data['resultContent']['outputParameter'])
+    # 务必删除当前请求
+    del self.driver.requests
     return meta
 
 
