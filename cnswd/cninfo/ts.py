@@ -21,7 +21,8 @@ from selenium.webdriver.support.ui import Select
 
 from ..utils import sanitize_dates
 from .base_driver import INTERVAL, SZXPage
-from .ops import datepicker
+from .css import TsCss
+from .ops import datepicker, parse_meta_data, current_dt_filter_mode, read_json_data
 from .utils import cleaned_data
 
 
@@ -29,43 +30,23 @@ class ThematicStatistics(SZXPage):
     """深证信专题统计api"""
     api_name = '专题统计'
     api_ename = 'thematicStatistics'
-    query_btn_css = 'button.stock-search:nth-child(11)'
-    delay = 1
+    css = TsCss
+    delay = 1  # 专题统计页加载时传送大量数据，稍微延时
 
-    def _is_none(self):
-        # 无过滤条件
-        css = 'div.tables-filter:nth-child(1)'
-        elem = self.driver.find_element_by_css_selector(css)
-        return not self._is_view(elem)
-
-    def _is_D(self):
-        # 单日期过滤
-        css = 'div.filter-condition:nth-child(5)'
-        elem = self.driver.find_element_by_css_selector(css)
-        return self._is_view(elem)
-
-    def _current_period_type(self):
+    def get_current_period_type(self, level):
         """项目日期设置类型"""
         # 根据输入参数有关日期部分决定日期设置行为
-        if self._is_none():
-            return None
-        elif self._is_D():
-            return 'DD'
-        # elif self._is_QQ():
-        #     return 'QQ'
-        # elif self._is_YY():
-        #     return 'YY'
-        raise ValueError("期间类型可能设置错误")
+        level_meta = self.get_level_meta_data(level)
+        return current_dt_filter_mode(level_meta)
 
-    def _set_date_filter(self, t1, t2):
-        period_type = self._current_period_type()
+    def _set_date_filter(self, level, t1, t2):
+        period_type = self.get_current_period_type(level)
         if period_type is None:
             return
         # 开始日期 ~ 结束日期
         # 默认以季度循环
         if period_type == 'DD':
-            css_1 = "#fBDatepair > input:nth-child(1)"
-            datepicker(self, t1, css_1)
+            datepicker(self, t1, self.css.sdate)
 
         # if period_type == 'QD':
         #     css_1 = "input.date:nth-child(1)"
@@ -80,13 +61,27 @@ class ThematicStatistics(SZXPage):
         # if period_type == 'QQ':
         #     select_year(self, t1)
         #     select_quarter(self, t2)
+    def _read_branch_data(self, level, t1, t2):
+        """读取分部数据"""
+        self._set_date_filter(level, t1, t2)
+        # 点击查询
+        btn_css = self.css.query_btn
+        btn = self.driver.find_element_by_css_selector(btn_css)
+        # 专题统计中部分项目隐藏命令按钮
+        # if btn.is_displayed():
+        btn.click()
+        # 固定等待加载，无法有效判断完成加载
+        time.sleep(0.5)
+        # self.driver.implicitly_wait(0.3)
+        res = read_json_data(self, level)
+        return res
 
-    def _before_read(self):
-        """等待数据完成加载"""
-        msg = f"等待查询{self.current_item}响应超时"
-        css = '.fixed-table-loading'
-        locator = (By.CSS_SELECTOR, css)
-        self.wait.until(EC.invisibility_of_element_located(locator), msg)
+    # def _before_read(self):
+    #     """等待数据完成加载"""
+    #     msg = f"等待查询{self.current_item}响应超时"
+    #     css = '.fixed-table-loading'
+    #     locator = (By.CSS_SELECTOR, css)
+    #     self.wait.until(EC.invisibility_of_element_located(locator), msg)
 
     def get_data(self, level, start=None, end=None):
         """获取项目数据
@@ -109,14 +104,15 @@ class ThematicStatistics(SZXPage):
         """
         start, end = sanitize_dates(start, end)
         self.ensure_init()
-        self.to_level(level)
         # 首先需要解析元数据
         meta = self.get_level_meta_data(level)
+        self.to_level(level)
         field_maps = meta['field_maps']
-        # 跳转到数据栏目会附带默认参数的遗留数据，为确保数据干净，先删除请求
-        # 注意次序。必须先解析完元数据，然后再删除
+
+        # 在读取数据前，删除缓存
         del self.driver.requests
+
         # 当前数据项目中文名称
         self.current_item = meta['api_name']
-        data = self._read_data_by_period(start, end)
+        data = self._read_data_by_period(level, start, end)
         return cleaned_data(data, field_maps)

@@ -115,6 +115,5 @@ def test_current_period_type(advance_api, name, expected):
 def test_internal_ps(advance_api, name, start, end, expected):
     level = advance_api.name_to_level(name)
     advance_api.to_level(level)
-    # advance_api.driver.save_screenshot(f"{level}.png")
     actual = advance_api._internal_ps(pd.Timestamp(start), pd.Timestamp(end))
     assert actual == expected

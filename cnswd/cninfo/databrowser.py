@@ -11,10 +11,15 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from ..utils import sanitize_dates
 from .base_driver import INTERVAL, SZXPage
-from .ops import (datepicker, element_attribute_change_to,
-                  element_text_change_to, find_by_id, input_code,
-                  parse_response, select_quarter, select_year,
-                  simulated_click, find_request)
+from .css import DbCss
+# from .ops import (datepicker, element_attribute_change_to,
+#                   element_text_change_to, find_by_id, input_code,
+#                   parse_response, select_quarter, select_year,
+#                   simulated_click, find_request)
+from .ops import (current_dt_filter_mode, datepicker,
+                  select_year, select_quarter, simulated_click,
+                  find_request, parse_response, element_text_change_to,
+                  element_attribute_change_to, input_code)
 from .utils import cleaned_data
 
 LEVEL_PAT = re.compile(r"\d{1,3}|[a-z]\d[a-z1-9]")
@@ -32,88 +37,65 @@ class DataBrowser(SZXPage):
     """深证信数据浏览器基础类"""
     api_name = '数据浏览器'
     api_ename = 'dataBrowse'
-    query_btn_css = '.stock-search'
+    css = DbCss
     delay = 0
-  
+    tab_id = 1
+
     def nav_tab(self, nth):
         """选择快速搜索或高级搜索
 
         Args:
             nth (int): 1代表快速搜索，2代表高级搜索
         """
+        assert nth in (1, 2)
         current_tab = getattr(self, 'current_tab', None)
         if current_tab == nth:
             return
-        assert nth in (1, 2)
         css = "btn{}".format(nth)
         btn = self.wait.until(EC.element_to_be_clickable((By.ID, css)))
         btn.click()
         self.current_tab = nth
 
-    # 基于日期过滤元素显示特性判断输入方式
-    def _current_dt_filter_mode(self):
-        """当前时间过滤输入模式"""
-        cond_css = [
-            '.condition1', '.condition2', 'div.filter-condition:nth-child(3)',
-            '.condition4'
-        ]
-        elems = [
-            self.driver.find_element_by_css_selector(css) for css in cond_css
-        ]
-        res = [self._is_view(elem) for elem in elems]
-        if not any(res):
-            return None  # 无时间限制
-        elif res[3] and sum(res[:3]) == 0:
-            return 'Y'  # 只输入年
-        elif all(res[:2]) and sum(res[2:]) == 0:
-            return 'YQ'  # 输入年、季度
-        elif res[2] and sum(res) == 1:
-            return 'DD'  # 输入 date ~ date
-        raise ValueError(f"算法出错")
-
-    def _current_period_type(self):
+    def get_current_period_type(self, level):
         """期间内部循环类型"""
         # 根据输入参数有关日期部分决定日期设置行为
         # 第一个字符代表freq
         # freq D | M | Q | Y
         # 第二个字符代表日期格式
         # 表达式 Y: 2019 | Q 2019 1 | D 2019-01-11
-        mode = self._current_dt_filter_mode()
+        level_name = self.level_to_name(level)
+        # 根据输入参数无法准确表达循环类型，使用硬编码
+        if level_name == '上市公司业绩预告':
+            return 'QQ'
+        # TODO:检查，目前没有参数
+        elif level_name == '股东大会议案':
+            return 'QD'
+        level_meta = self.get_level_meta_data(level)
+        mode = current_dt_filter_mode(level_meta)
         tab_id = self.tab_id
-        level = self.api_level
-        if mode is None:
-            return None
-        elif mode == 'DD':
+        if mode == 'DD':
             # 网站设定限制，每次返回最大20000行
             # 数量量大的项目，每次取一个月的数据
             # 由于可能存在网站菜单栏目变动问题，映射表可能发生变化
             # 当前硬编码将`投资评级`设定为按月循环，数据量大约在10000行以内
             # 至于其他栏目甚至可以一次性读取，此处简化为统一按季度内部循环
-            if tab_id == 2 and level in ('3', ):
+            if tab_id == 2 and level_name in ('投资评级', ):
                 return 'MD'
             # 否则按季度循环
             return 'QD'
-        elif mode == 'YQ':
-            # 按季度循环，输入年、季度
-            return 'QQ'
-        elif mode == 'Y':
-            # 按年循环，只输入年份
-            return 'YY'
-        raise ValueError("期间类型可能设置错误")
+        return mode
 
-    def _set_date_filter(self, t1, t2):
-        mode = self._current_period_type()
+    def _set_date_filter(self, level, t1, t2):
+        mode = self.get_current_period_type(level)
         if mode is None:
             return
         dt_fmt = mode[1]
         # 开始日期 ~ 结束日期
         if dt_fmt == 'D':
             if t1:
-                css_1 = "input.date:nth-child(1)"
-                datepicker(self, t1, css_1)
+                datepicker(self, t1, self.css.sdate)
             if t2:
-                css_2 = "input.form-control:nth-child(2)"
-                datepicker(self, t2, css_2)
+                datepicker(self, t2, self.css.edate)
         # 年 季度
         if t1 and dt_fmt == 'Q':
             select_year(self, t1)
@@ -121,20 +103,13 @@ class DataBrowser(SZXPage):
         # 年
         if t1 and dt_fmt == 'Y':
             # 特殊
-            select_year(self, t1, 'se2')
+            select_year(self, t1)
 
     def _before_read(self):
         """等待数据完成加载"""
-        css = '.span_target'
-        locator = (By.CSS_SELECTOR, css)
+        locator = (By.CSS_SELECTOR, self.css.data_loaded)
         self.wait.until(
-            element_attribute_change_to(locator, 'style', 'display: none;'))
-        # page_css = '.pagination-info'
-        # page_elem = self.driver.find_element_by_css_selector(page_css)
-        # if page_elem.is_displayed():
-        #     text = page_elem.text
-        #     page = int(PAGE_PAT.findall(text)[0])
-        #     self.logger.info(f"已加载数据{page:5} 条记录【可能少于实际解析，以解析为准】")
+            element_attribute_change_to(locator, 'class', 'onloading hide'))
 
 
 class FastSearcher(DataBrowser):
@@ -178,7 +153,7 @@ class FastSearcher(DataBrowser):
         # 当前数据项目中文名称
         self.current_item = meta['api_name']
         input_code(self, code)
-        data = self._read_data_by_period(start, end)
+        data = self._read_data_by_period(level, start, end)
         return cleaned_data(data, field_maps)
 
 
@@ -197,6 +172,7 @@ class AdvanceSearcher(DataBrowser):
     @property
     def stocks_in_trading(self):
         """全市场股票代码"""
+        self.ensure_init()
         # 用时约3秒
         codes = getattr(self, '_codes', {})
         # 由于加载成功后会缓存在本地，后续加载会很快完成
@@ -205,7 +181,8 @@ class AdvanceSearcher(DataBrowser):
         if not nums:
             data_ids = ['101', '102', '107', '108', '110', '106', '109']
             for data_id in data_ids:
-                api_elem = find_by_id(self, data_id)
+                elem_css = self.css.market_code_fmt.format(data_id)
+                api_elem = self.driver.find_element_by_css_selector(elem_css)
                 # 直接使用模拟点击，简化操作
                 simulated_click(self, api_elem)
                 self.driver.implicitly_wait(INTERVAL)
@@ -234,13 +211,11 @@ class AdvanceSearcher(DataBrowser):
             return
         # 调用属性，确保生成数量字典
         _ = self.stocks_in_trading
-        chose_all_css = '.cont-top-right > div:nth-child(1) > div:nth-child(1) > label:nth-child(1)'
-        add_btn_css = '.cont-top-right > div:nth-child(2) > button:nth-child(1)'
-        num_check_css = '.cont-top-right > div:nth-child(1) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
-        locator = (By.CSS_SELECTOR, num_check_css)
+        locator = (By.CSS_SELECTOR, self.css.to_select_code)
         data_ids = ['101', '102', '107', '108', '110', '106', '109']
         for data_id in data_ids:
-            api_elem = find_by_id(self, data_id)
+            elem_css = self.css.market_code_fmt.format(data_id)
+            api_elem = self.driver.find_element_by_css_selector(elem_css)
             # 直接使用模拟点击，简化操作
             simulated_click(self, api_elem)
             # 模拟点击后务必预留时间
@@ -251,19 +226,19 @@ class AdvanceSearcher(DataBrowser):
             # 仅当数量不为0时执行添加
             if self._nums[data_id]:
                 # 全部添加
-                self._add_or_delete_all(chose_all_css, add_btn_css)
-        selectedcount_css = '.cont-top-right > div:nth-child(3) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
-        actual = int(self.driver.find_element_by_css_selector(selectedcount_css).text)
+                self._add_or_delete_all(
+                    self.css.all_input_code, self.css.add_all_code_btn)
+        actual = int(self.driver.find_element_by_css_selector(
+            self.css.selected_code).text)
         expected = sum(self._nums.values())
         assert actual == expected, f"股票总数应为：{expected}，实际：{actual}"
         self._code_loaded = True
 
     def _select_all_fields(self):
         """全选字段"""
-        label_css = '.detail-cont-bottom > div:nth-child(1) > div:nth-child(1) > label:nth-child(1)'
-        btn_css = '.detail-cont-bottom > div:nth-child(2) > button:nth-child(1)'
         # 全选数据字段
-        self._add_or_delete_all(label_css, btn_css)
+        self._add_or_delete_all(self.css.add_all_field,
+                                self.css.add_all_field_btn)
 
     def _add_or_delete_all(self, label_css, btn_css):
         """添加或删除所选全部元素"""
@@ -274,10 +249,10 @@ class AdvanceSearcher(DataBrowser):
 
     def _before_query(self):
         """执行查询前应完成的动作"""
-        # 高级搜索需要加载全部代码、全选擦查询字段
+        # 高级搜索需要加载全部代码、全选查询字段
         self._load_all_code()
-        check_css = '.detail-cont-bottom > div:nth-child(3) > div:nth-child(1) > span:nth-child(2) > i:nth-child(1)'
-        num = int(self.driver.find_element_by_css_selector(check_css).text)
+        num = int(self.driver.find_element_by_css_selector(
+            self.css.selected_field).text)
         # 只有非0时才需要全选字段
         if not num:
             self._select_all_fields()
@@ -315,5 +290,5 @@ class AdvanceSearcher(DataBrowser):
         # 当前数据项目中文名称
         self.current_item = name = meta['api_name']
         self._before_query()
-        data = self._read_data_by_period(start, end)
+        data = self._read_data_by_period(level, start, end)
         return cleaned_data(data, field_maps, name)

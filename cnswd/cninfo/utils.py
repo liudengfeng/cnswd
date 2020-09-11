@@ -64,7 +64,7 @@ def _convert_func(field_type, name=None, fieldName=None):
         return partial(pd.to_datetime, errors='coerce')
     elif type_ in ('BIGINT', 'INT'):
         return int
-    elif type_ in ('DECIMAL', 'NUMERIC'):
+    elif type_ in ('DECIMAL', 'NUMERIC', 'NUMBER'):
         return lambda x: x
     raise ValueError(f"未定义类型'{type_}'")
 

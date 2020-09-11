@@ -133,7 +133,7 @@ class SSEPage(object):
             # 此时使用查询按钮
             btn_css = '#btnQuery'
             self.driver.find_element_by_css_selector(btn_css).click()
-        # self.driver.save_screenshot(f'{info}.png')
+        
         # 5.获取页数
         total = self._get_total_page_num()
         # 6.分页读取

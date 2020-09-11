@@ -10,19 +10,18 @@ import warnings
 
 import pandas as pd
 from retry.api import retry_call
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.common.exceptions import TimeoutException
 
 from .._seleniumwire import make_headless_browser
 from ..setting.config import POLL_FREQUENCY, TIMEOUT
 from ..utils import make_logger
 from ..utils.loop_utils import batch_loop, loop_period_by
-from .ops import (datepicker, get_nav_info, input_code,
-                  element_attribute_change_to, parse_response, find_by_id,
-                  element_text_change_to, navigate, parse_meta_data,
-                  read_json_data, simulated_click, select_year, select_quarter)
+from .css import CSS
+from .ops import (find_menu, get_all_menu_info, parse_menu_info,
+                  parse_meta_data, read_json_data)
 
 INTERVAL = 0.3
 
@@ -42,7 +41,7 @@ class SZXPage(object):
     # 子类需要改写的属性
     api_name = ''
     api_ename = ''
-    query_btn_css = ''
+    css = CSS
     delay = 0
 
     def __init__(self):
@@ -72,12 +71,11 @@ class SZXPage(object):
         self.logger = make_logger(self.api_name)
         self.driver.get(HOME_URL_FMT.format(self.api_ename))
         self.driver.implicitly_wait(INTERVAL + self.delay)
-        check_css = '.nav-title'
-        m = EC.visibility_of_element_located((By.CSS_SELECTOR, check_css))
+        m = EC.visibility_of_element_located(
+            (By.CSS_SELECTOR, self.css.check_loaded))
         title = self.wait.until(m, message="加载主页失败")
         expected = self.api_name.split('-')[0]
         assert title.text == expected, f"完成加载后，标题应为:{expected}，实际为'{title.text}'。"
-        # self.driver.save_screenshot('p.png')
         self.logger.info(f'加载耗时：{(time.time() - start):>0.2f}秒')
         # 限定范围，提高性能
         # http://webapi.cninfo.com.cn/api/sysapi/p_sysapi1017?apiname=p_stock2215
@@ -91,17 +89,24 @@ class SZXPage(object):
     def levels(self):
         """数据层级信息"""
         self.ensure_init()
-        _levels = getattr(self, '_levels', None)
+        _levels = getattr(self, '_levels', [])
         if not _levels:
-            self.logger.info("提取项目元数据信息......")
-            self._levels = get_nav_info(self)
+            self.logger.info("提取全部项目信息......")
+            self._levels = get_all_menu_info(self, self.css.menu_root)
+            self.logger.info("Done.")
         return self._levels
 
     def name_to_level(self, name):
+        """菜单名称转换为菜单层级"""
         for info in self.levels:
-            if info['名称'] == name:
-                return info['层级']
+            if info.name == name:
+                return info.pos
         raise ValueError(f"不存在数据项目:{name}")
+
+    def level_to_name(self, level):
+        """菜单层级转换为菜单名称"""
+        menu = parse_menu_info(find_menu(self, level))
+        return menu.name
 
     def get_level_meta_data(self, level):
         """项目元数据
@@ -116,8 +121,8 @@ class SZXPage(object):
         level_meta_data = _meta_data.get(level, {})
         if not level_meta_data:
             self.ensure_init()
-            self.to_level(level)
-            self._meta_data[level] = parse_meta_data(self)
+            menu = self.to_level(level)
+            self._meta_data[level] = parse_meta_data(self, menu)
         return self._meta_data[level]
 
     def to_level(self, level):
@@ -126,40 +131,51 @@ class SZXPage(object):
         Args:
             level (str): 指定菜单层级
         """
-        # 默认值必须设置为空
-        current_level = getattr(self, 'current_level', '')
-        if current_level != level:
-            navigate(self, level)
-            self.current_level = level
-            self.driver.implicitly_wait(INTERVAL)
+        menu = parse_menu_info(find_menu(self, level))
+        if menu.pos != level:
+            self.to_level(level)
+        return menu
 
-    def _read_branch_data(self, t1, t2):
+    def _set_date_filter(self, level, t1, t2):
+        raise NotImplemented('子类中重写')
+
+    def _before_read(self):
+        raise NotImplemented('子类中重写')
+
+    def _read_branch_data(self, level, t1, t2):
         """读取分部数据"""
-        self._set_date_filter(t1, t2)
+        self._set_date_filter(level, t1, t2)
         # 点击查询
-        btn_css = self.query_btn_css
+        btn_css = self.css.query_btn
         btn = self.driver.find_element_by_css_selector(btn_css)
         # 专题统计中部分项目隐藏命令按钮
         if btn.is_displayed():
             btn.click()
+
         # 等待完全发送查询指令
         retry_call(self._before_read,
                    exceptions=(TimeoutException, ),
                    tries=3,
                    logger=self.logger)
-        res = read_json_data(self)
+        res = read_json_data(self, level)
         return res
 
-    def _internal_ps(self, start, end):
+    def get_current_period_type(self, level, t1, t2):
+        raise NotImplemented('子类中重写')
+
+    def get_current_period_type(self, level):
+        raise NotImplemented('子类中重写')
+
+    def _internal_ps(self, level, start, end):
         """输出(t1,t2)内部循环元组列表"""
         assert isinstance(start, pd.Timestamp)
         assert isinstance(end, pd.Timestamp)
-        loop_str = self._current_period_type()
+        loop_str = self.get_current_period_type(level)
         if loop_str is None:
             return [(None, None)]
         freq = loop_str[0]
         fmt_str = loop_str[1]
-        tab_id = getattr(self, 'tab_id', '')
+        tab_id = getattr(self, 'tab_id', 0)
         # 单个股票可以一次性查询期间所有数据
         if tab_id == 1 and fmt_str in ('B', 'D', 'W', 'M'):
             t1, t2 = start.strftime(r'%Y-%m-%d'), end.strftime(r'%Y-%m-%d')
@@ -195,13 +211,14 @@ class SZXPage(object):
             raise ValueError(f'目前不支持FREQ"{loop_str}"格式。')
         return [(t1_fmt_func(p[0]), t2_fmt_func(p[1])) for p in ps]
 
-    def _read_data_by_period(self, start, end):
+    def _read_data_by_period(self, level, start, end):
         """划分区间读取数据"""
         res = []
-        ps = self._internal_ps(start, end)
+        ps = self._internal_ps(level, start, end)
+        name = self.level_to_name(level)
         for t1, t2 in ps:
-            self.logger.info(f'{self.current_item:<20}  时段 ({t1} ~ {t2})')
-            data = self._read_branch_data(t1, t2)
+            data = self._read_branch_data(level, t1, t2)
+            self.logger.info(f'{name:<20}  时段 ({t1} ~ {t2}) {len(data):>6}条记录')
             res.extend(data)
         return res
 

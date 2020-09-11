@@ -68,8 +68,8 @@ def get_start(coll):
 
 def _find_level(name, infoes):
     for d in infoes:
-        if d['名称'] == name:
-            return d['层级']
+        if d.name == name:
+            return d.pos
 
 
 def create_index_for(coll):
@@ -145,8 +145,8 @@ def refresh_asr(items):
     with AdvanceSearcher() as api:
         infoes = api.levels
         for info in infoes:
-            level = info['层级']
-            name = info['名称']
+            level = info.pos
+            name = info.name
             if name not in items:
                 continue
             api.to_level(level)
