@@ -22,7 +22,7 @@ from selenium.webdriver.support.ui import Select
 from ..utils import sanitize_dates
 from .base_driver import INTERVAL, SZXPage
 from .css import TsCss
-from .ops import datepicker, parse_meta_data, current_dt_filter_mode, read_json_data
+from .ops import datepicker, parse_meta_data, read_json_data
 from .utils import cleaned_data
 
 
@@ -34,19 +34,18 @@ class ThematicStatistics(SZXPage):
     delay = 1  # 专题统计页加载时传送大量数据，稍微延时
 
     def get_current_period_type(self, level):
-        """项目日期设置类型"""
-        # 根据输入参数有关日期部分决定日期设置行为
-        level_meta = self.get_level_meta_data(level)
-        return current_dt_filter_mode(level_meta)
+        # 只处理融资融券数据
+        return 'BD'
 
     def _set_date_filter(self, level, t1, t2):
         period_type = self.get_current_period_type(level)
-        if period_type is None:
-            return
+        # if period_type is None:
+        #     return
         # 开始日期 ~ 结束日期
         # 默认以季度循环
-        if period_type == 'DD':
-            datepicker(self, t1, self.css.sdate)
+        if period_type == 'BD':
+            datepicker(self, t1, self.css.sdate, use_tab=False)
+            self._filter_pattern['tdate'] = t1
 
         # if period_type == 'QD':
         #     css_1 = "input.date:nth-child(1)"
@@ -61,27 +60,26 @@ class ThematicStatistics(SZXPage):
         # if period_type == 'QQ':
         #     select_year(self, t1)
         #     select_quarter(self, t2)
-    def _read_branch_data(self, level, t1, t2):
-        """读取分部数据"""
-        self._set_date_filter(level, t1, t2)
-        # 点击查询
-        btn_css = self.css.query_btn
-        btn = self.driver.find_element_by_css_selector(btn_css)
-        # 专题统计中部分项目隐藏命令按钮
-        # if btn.is_displayed():
-        btn.click()
-        # 固定等待加载，无法有效判断完成加载
-        time.sleep(0.5)
-        # self.driver.implicitly_wait(0.3)
-        res = read_json_data(self, level)
-        return res
+    # def _read_branch_data(self, level, t1, t2):
+    #     """读取分部数据"""
+    #     self._set_date_filter(level, t1, t2)
+    #     # 点击查询
+    #     btn_css = self.css.query_btn
+    #     btn = self.driver.find_element_by_css_selector(btn_css)
+    #     # 专题统计中部分项目隐藏命令按钮
+    #     # if btn.is_displayed():
+    #     btn.click()
+    #     self._before_read()
+    #     res = read_json_data(self, level)
+    #     return res
 
-    # def _before_read(self):
-    #     """等待数据完成加载"""
-    #     msg = f"等待查询{self.current_item}响应超时"
-    #     css = '.fixed-table-loading'
-    #     locator = (By.CSS_SELECTOR, css)
-    #     self.wait.until(EC.invisibility_of_element_located(locator), msg)
+    def _before_read(self):
+        """等待数据完成加载"""
+        # msg = f"等待查询{self.current_item}响应超时"
+        # locator = (By.CSS_SELECTOR, self.css.data_loaded)
+        # self.wait.until(EC.invisibility_of_element_located(locator), msg)
+        # 暂时无有效方式确定是否完成加载
+        self.driver.implicitly_wait(2)
 
     def get_data(self, level, start=None, end=None):
         """获取项目数据
@@ -106,11 +104,9 @@ class ThematicStatistics(SZXPage):
         self.ensure_init()
         # 首先需要解析元数据
         meta = self.get_level_meta_data(level)
-        self.to_level(level)
+        menu = self.to_level(level)
+        assert menu.pos == level, "菜单位置不正确"
         field_maps = meta['field_maps']
-
-        # 在读取数据前，删除缓存
-        del self.driver.requests
 
         # 当前数据项目中文名称
         self.current_item = meta['api_name']

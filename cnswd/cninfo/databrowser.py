@@ -12,14 +12,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from ..utils import sanitize_dates
 from .base_driver import INTERVAL, SZXPage
 from .css import DbCss
-# from .ops import (datepicker, element_attribute_change_to,
-#                   element_text_change_to, find_by_id, input_code,
-#                   parse_response, select_quarter, select_year,
-#                   simulated_click, find_request)
-from .ops import (current_dt_filter_mode, datepicker,
-                  select_year, select_quarter, simulated_click,
-                  find_request, parse_response, element_text_change_to,
-                  element_attribute_change_to, input_code)
+from .ops import (datepicker, element_attribute_change_to,
+                  element_text_change_to, get_db_date_filter_mode, input_code, toggler_market_open,
+                  parse_response, select_quarter, select_year, simulated_click)
 from .utils import cleaned_data
 
 LEVEL_PAT = re.compile(r"\d{1,3}|[a-z]\d[a-z1-9]")
@@ -64,14 +59,7 @@ class DataBrowser(SZXPage):
         # 第二个字符代表日期格式
         # 表达式 Y: 2019 | Q 2019 1 | D 2019-01-11
         level_name = self.level_to_name(level)
-        # 根据输入参数无法准确表达循环类型，使用硬编码
-        if level_name == '上市公司业绩预告':
-            return 'QQ'
-        # TODO:检查，目前没有参数
-        elif level_name == '股东大会议案':
-            return 'QD'
-        level_meta = self.get_level_meta_data(level)
-        mode = current_dt_filter_mode(level_meta)
+        mode = get_db_date_filter_mode(self, level)
         tab_id = self.tab_id
         if mode == 'DD':
             # 网站设定限制，每次返回最大20000行
@@ -94,22 +82,27 @@ class DataBrowser(SZXPage):
         if dt_fmt == 'D':
             if t1:
                 datepicker(self, t1, self.css.sdate)
+                self._filter_pattern['sdate'] = t1
             if t2:
                 datepicker(self, t2, self.css.edate)
+                self._filter_pattern['edate'] = t2
         # 年 季度
         if t1 and dt_fmt == 'Q':
             select_year(self, t1)
             select_quarter(self, t2)
+            t = pd.Period(year=t1, quarter=t2, freq='Q').asfreq('D')
+            self._filter_pattern['sdate'] = t.strftime(r'%Y%m%d')
+            self._filter_pattern['edate'] = t.strftime(r'%Y%m%d')
         # 年
         if t1 and dt_fmt == 'Y':
             # 特殊
             select_year(self, t1)
+            self._filter_pattern['syear'] = t1
 
     def _before_read(self):
-        """等待数据完成加载"""
         locator = (By.CSS_SELECTOR, self.css.data_loaded)
-        self.wait.until(
-            element_attribute_change_to(locator, 'class', 'onloading hide'))
+        self.wait.until(element_attribute_change_to(
+            locator, 'class', 'onloading hide'))
 
 
 class FastSearcher(DataBrowser):
@@ -153,6 +146,7 @@ class FastSearcher(DataBrowser):
         # 当前数据项目中文名称
         self.current_item = meta['api_name']
         input_code(self, code)
+        self._filter_pattern['scode'] = code
         data = self._read_data_by_period(level, start, end)
         return cleaned_data(data, field_maps)
 
@@ -183,15 +177,12 @@ class AdvanceSearcher(DataBrowser):
             for data_id in data_ids:
                 elem_css = self.css.market_code_fmt.format(data_id)
                 api_elem = self.driver.find_element_by_css_selector(elem_css)
-                # 直接使用模拟点击，简化操作
-                simulated_click(self, api_elem)
-                self.driver.implicitly_wait(INTERVAL)
+                toggler_market_open(self, data_id)
+                # self.driver.implicitly_wait(INTERVAL)
                 data_name = api_elem.get_attribute('data-name')
                 data_api = api_elem.get_attribute('data-api')
-                data_param = api_elem.get_attribute('data-param')
-                data_path = f"{data_api}?{data_param}"
-                request = find_request(self, data_path)
-                request = self.driver.wait_for_request(request.path)
+                # data_param = api_elem.get_attribute('data-param')
+                request = self.driver.wait_for_request(data_api)
                 data = parse_response(self, request)
                 num = len(data)
                 nums[data_id] = num
@@ -288,7 +279,7 @@ class AdvanceSearcher(DataBrowser):
         meta = self.get_level_meta_data(level)
         field_maps = meta['field_maps']
         # 当前数据项目中文名称
-        self.current_item = name = meta['api_name']
+        name = meta['api_name']
         self._before_query()
         data = self._read_data_by_period(level, start, end)
         return cleaned_data(data, field_maps, name)

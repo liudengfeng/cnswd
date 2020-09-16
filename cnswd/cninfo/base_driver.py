@@ -1,7 +1,10 @@
 """
-
 深证信基础模块
 
+菜单层级
++ 每位字符代表一层 842 代表三层菜单
++ 数字代表自然序号，超过10，则以自然序号替代 a=10 b=11
++ 单位层级无子级菜单 如 1
 """
 import os
 import random
@@ -14,13 +17,15 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
+from toolz.dicttoolz import itemmap
 
 from .._seleniumwire import make_headless_browser
 from ..setting.config import POLL_FREQUENCY, TIMEOUT
 from ..utils import make_logger
 from ..utils.loop_utils import batch_loop, loop_period_by
 from .css import CSS
-from .ops import (find_menu, get_all_menu_info, parse_menu_info,
+from .ops import (find_menu, find_menu_name_by, find_pos_list,
+                  get_all_menu_info, get_current_menu, parse_menu_info,
                   parse_meta_data, read_json_data)
 
 INTERVAL = 0.3
@@ -43,6 +48,7 @@ class SZXPage(object):
     api_ename = ''
     css = CSS
     delay = 0
+    _filter_pattern = {}
 
     def __init__(self):
         self.driver = None
@@ -55,6 +61,7 @@ class SZXPage(object):
 
     def __exit__(self, *args):
         if self.driver:
+            # self.driver.delete_all_cookies()
             self.driver.quit()
 
     def __str__(self):
@@ -83,30 +90,47 @@ class SZXPage(object):
         self.driver.scopes = [
             'webapi.cninfo.com.cn',
         ]
+        # 首先需要解析启动项目的元数据。确保删除首项元数据请求，保证后续元数据能够正确解析
+        start_pos = get_current_menu(self).pos
+        self._meta_data[start_pos] = parse_meta_data(self)
         self.inited = True
 
     @property
-    def levels(self):
-        """数据层级信息"""
-        self.ensure_init()
-        _levels = getattr(self, '_levels', [])
-        if not _levels:
-            self.logger.info("提取全部项目信息......")
-            self._levels = get_all_menu_info(self, self.css.menu_root)
-            self.logger.info("Done.")
-        return self._levels
+    def pos_list(self):
+        """网页菜单位置列表"""
+        if not getattr(self, '_pos_list', None):
+            self.ensure_init()
+            self._pos_list = find_pos_list(self, self.css.menu_root)
+        return self._pos_list
 
-    def name_to_level(self, name):
-        """菜单名称转换为菜单层级"""
-        for info in self.levels:
-            if info.name == name:
-                return info.pos
-        raise ValueError(f"不存在数据项目:{name}")
+    @property
+    def menu_name_maps(self):
+        """菜单名称与菜单位置映射"""
+        if not getattr(self, '_menu_name_maps', {}):
+            self.ensure_init()
+            self._menu_name_maps = {find_menu_name_by(
+                self, pos, self.css.menu_root): pos for pos in self.pos_list}
+        return self._menu_name_maps
 
-    def level_to_name(self, level):
-        """菜单层级转换为菜单名称"""
-        menu = parse_menu_info(find_menu(self, level))
-        return menu.name
+    @property
+    def current_menu(self):
+        """当前活动菜单"""
+        return get_current_menu(self)
+
+    def to_level(self, level):
+        """导航至层级菜单
+
+        Args:
+            level (str): 指定菜单层级
+        """
+        pos_list = self.pos_list
+        if level == pos_list[0]:
+            return self.current_menu
+        # 初始化菜单
+        if self.current_menu.pos != level:
+            self.ensure_init()
+            return parse_menu_info(find_menu(self, level))
+        return self.current_menu
 
     def get_level_meta_data(self, level):
         """项目元数据
@@ -117,33 +141,35 @@ class SZXPage(object):
         Returns:
             dict: 元数据字典
         """
-        _meta_data = getattr(self, '_meta_data', {})
-        level_meta_data = _meta_data.get(level, {})
+        self.ensure_init()
+        meta_data = self._meta_data
+        level_meta_data = meta_data.get(level, {})
         if not level_meta_data:
-            self.ensure_init()
-            menu = self.to_level(level)
-            self._meta_data[level] = parse_meta_data(self, menu)
+            prev_menu = self.current_menu
+            self.to_level(level)
+            self._meta_data[level] = parse_meta_data(self)
+            # 恢复至之前的菜单
+            self.to_level(prev_menu.pos)
         return self._meta_data[level]
 
-    def to_level(self, level):
-        """导航至层级菜单
+    def name_to_level(self, name):
+        """菜单名称转换为菜单层级"""
+        return self.menu_name_maps[name]
 
-        Args:
-            level (str): 指定菜单层级
-        """
-        menu = parse_menu_info(find_menu(self, level))
-        if menu.pos != level:
-            self.to_level(level)
-        return menu
+    def level_to_name(self, level):
+        """菜单层级转换为菜单名称"""
+        return itemmap(reversed, self.menu_name_maps)[level]
 
     def _set_date_filter(self, level, t1, t2):
-        raise NotImplemented('子类中重写')
+        pass
 
     def _before_read(self):
-        raise NotImplemented('子类中重写')
+        pass
 
     def _read_branch_data(self, level, t1, t2):
         """读取分部数据"""
+        # 每次读取数据时，重置过滤模式
+        self._filter_pattern = {}
         self._set_date_filter(level, t1, t2)
         # 点击查询
         btn_css = self.css.query_btn
@@ -151,20 +177,14 @@ class SZXPage(object):
         # 专题统计中部分项目隐藏命令按钮
         if btn.is_displayed():
             btn.click()
-
-        # 等待完全发送查询指令
-        retry_call(self._before_read,
-                   exceptions=(TimeoutException, ),
-                   tries=3,
-                   logger=self.logger)
+        # 确定发出全部请求
+        self._before_read()
         res = read_json_data(self, level)
         return res
 
-    def get_current_period_type(self, level, t1, t2):
-        raise NotImplemented('子类中重写')
-
     def get_current_period_type(self, level):
-        raise NotImplemented('子类中重写')
+        # '子类中重写'
+        return ''
 
     def _internal_ps(self, level, start, end):
         """输出(t1,t2)内部循环元组列表"""
@@ -180,9 +200,9 @@ class SZXPage(object):
         if tab_id == 1 and fmt_str in ('B', 'D', 'W', 'M'):
             t1, t2 = start.strftime(r'%Y-%m-%d'), end.strftime(r'%Y-%m-%d')
             return [(t1, t2)]
-        # 对于财务类，即周期频率为Q，排除未来日期
-        ps = loop_period_by(start, end, freq, False) if freq != 'Q' else loop_period_by(
-            start, end, freq, True)
+        # 对于财务类，即loop_str为YQ，排除未来日期
+        exclude_future = True if loop_str == 'YQ' else False
+        ps = loop_period_by(start, end, freq, exclude_future)
 
         if fmt_str in ('B', 'D', 'W', 'M'):
 
@@ -224,12 +244,13 @@ class SZXPage(object):
 
     def reset(self):
         """恢复至初始状态"""
-        self._ensure_init()
+        self.ensure_init()
         # 一般而言出现异常均有提示信息出现
         try:
             self.driver.switch_to.alert.dismiss()
         except Exception:
             pass
+        self._filter_pattern = {}
         # 刷新浏览器
         self.driver.refresh()
 

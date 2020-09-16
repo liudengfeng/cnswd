@@ -11,18 +11,40 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
+from toolz import groupby
 
 from ..setting.config import TIMEOUT
-
 
 DT_PAT = re.compile("date|year")
 MENU = namedtuple('MENU', 'pos, name, code')
 
 
-def find_request(self, path):
-    for r in self.driver.requests:
-        if r.method == 'POST' and path in r.url:
-            return r
+# region 菜单
+
+
+def find_pos_list(self, root_css):
+    """独立菜单位置列表【不含子级菜单】"""
+    css = f"{root_css} li[data-pos]"
+    lis = self.driver.find_elements_by_css_selector(css)
+    pos_list = [li.get_attribute('data-pos') for li in lis]
+    levels = groupby(len, pos_list)
+    menu_pos = []
+    len_max = max(levels.keys())
+    menu_pos.extend(levels[len_max])
+    for l in range(len_max-1, 0, -1):
+        ps = set([x[:l] for x in levels[l+1]])
+        to_add = set(levels[l]) - ps
+        menu_pos.extend(to_add)
+    return sorted(menu_pos)
+
+
+def find_menu_name_by(self, pos, root_css):
+    """根据菜单位置查找菜单名称"""
+    css = f"{root_css} li[data-pos='{pos}']"
+    li = self.driver.find_element_by_css_selector(css)
+    # 可能菜单处于隐藏状态，执行脚本获取text
+    js = "return arguments[0].innerText;"
+    return self.driver.execute_script(js, li)
 
 
 def find_menu(self, pos):
@@ -34,15 +56,17 @@ def find_menu(self, pos):
     Returns:
         element: 菜单元素对象
     """
+    li_css_fmt = 'li[data-pos="{}"]'
     for i in range(1, len(pos)+1):
-        css = f'li[data-pos="{pos[:i]}"]'
-        elem = self.driver.find_element_by_css_selector(css)
-        if 'active' not in elem.get_attribute('class'):
-            elem.click()
-    return elem
+        current_pos = pos[:i]
+        css = li_css_fmt.format(current_pos)
+        li = self.driver.find_element_by_css_selector(css)
+        if 'active' not in li.get_attribute('class'):
+            li.find_element_by_tag_name('a').click()
+    return li
 
 
-def parse_menu_info(elem):
+def parse_menu_info(li):
     """解析菜单信息
 
     Args:
@@ -51,9 +75,9 @@ def parse_menu_info(elem):
     Returns:
         namedtuple: 菜单信息命名元组
     """
-    a = elem.find_element_by_tag_name('a')
+    a = li.find_element_by_tag_name('a')
     return MENU(
-        pos=elem.get_attribute('data-pos'),
+        pos=li.get_attribute('data-pos'),
         name=a.text,
         code=a.get_attribute('data-code')
     )
@@ -68,33 +92,50 @@ def get_all_menu_info(self, root_css):
     Returns:
         list: 菜单信息命名元组列表
     """
-    menu_root = self.driver.find_element_by_css_selector(root_css)
-    items = menu_root.find_elements_by_css_selector('li[data-pos]')
-    pos_list = [e.get_attribute('data-pos') for e in items]
+    pos_list = find_pos_list(self, root_css)
     res = []
     for pos in pos_list:
         elem = find_menu(self, pos)
-        time.sleep(0.3)
-        if 'has-child' not in elem.get_attribute('class'):
-            res.append(parse_menu_info(elem))
+        res.append(parse_menu_info(elem))
     return res
 
 
-def find_info_request(self, menu):
+def get_current_menu(self):
+    """获取当前活动菜单对象"""
+    css = f"{self.css.menu_root} li.active[data-pos]"
+    lis = self.driver.find_elements_by_css_selector(css)
+    li = max(lis, key=lambda li: li.get_attribute('data-pos'))
+    return parse_menu_info(li)
+
+# endregion
+
+# region 元数据
+
+
+def find_menu_request(self, menu):
+    """查找菜单对应的请求"""
+    # 有且仅有一条请求
     path = f'info?gatewayCode={menu.code}'
     for r in self.driver.requests:
         if r.method == 'GET' and path in r.url:
             return r
 
 
-@retry(AttributeError, tries=3, delay=1)
-def parse_meta_data(self, menu):
+def parse_meta_data(self):
     """解析元数据"""
     meta = {}
-    request = find_info_request(self, menu)
+    menu = get_current_menu(self)
+    request = find_menu_request(self, menu)
+    # 等待响应完成后才解析
+    request = self.driver.wait_for_request(request.path)
     response = request.response
     if response.status_code == 200:
-        body = request._client.get_response_body(request.id)
+        # 直接使用 request.response.body
+        # request.response 显示 body=b''
+        # request.response.body则显示具体内容
+        # 以下为调用后台方法
+        # body = request._client.get_response_body(request.id)
+        body = request.response.body
         json_data = json.loads(body)
         if json_data['msg'] == 'success':
             data = json_data['data']
@@ -105,35 +146,60 @@ def parse_meta_data(self, menu):
             meta['inputParameter'] = data['requestConfig']['inputParameter']
             meta['field_maps'] = json.loads(
                 data['resultContent']['outputParameter'])
-    # 删除当前请求
-    del request
+    # 解析完成后，务必删除所有请求，否则会导致请求定位误差
+    del self.driver.requests
     return meta
+
+
+def get_condition_style(self, pos, suffix):
+    """获取输入条件各元素显示风格属性"""
+    self.to_level(pos)
+    css = self.css.condition_fmt.format(suffix)
+    elem = self.driver.find_element_by_css_selector(css)
+    return elem.get_attribute('style')
+
+
+def db_date_filter_mode(styles):
+    """根据时间过滤元素显示风格提示输入类型"""
+    A = 'display: none;'
+    B = 'display: inline-block;'
+    if all([x == A for x in styles]):
+        return None
+    if styles[0] == B and styles[1] == B:
+        return 'YQ'
+    if styles[3] == B:
+        return 'YY'
+    return 'DD'
+
+
+def get_db_date_filter_mode(self, pos):
+    """数据浏览器时间过滤类型"""
+    n_list = [1, 2, 3, 4]
+    styles = [get_condition_style(self, pos, n) for n in n_list]
+    return db_date_filter_mode(styles)
+
+# endregion
+
+
+# region 选择股票代码
+
+def toggler_market_open(self, data_id):
+    li_css = self.css.market_css
+    li = self.driver.find_element_by_css_selector(li_css)
+    if 'opened' not in li.get_attribute('class'):
+        li.find_element_by_tag_name('span').click()
+    span_css = f"{li_css} a[data-id='{data_id}']"
+    span = self.driver.find_element_by_css_selector(span_css)
+    span.click()
+
+# endregion
+
+# region 输入时间过滤条件
 
 
 def simulated_click(self, em):
     """使用脚本模拟点击"""
     self.driver.execute_script("arguments[0].click();", em)
-
-
-def current_dt_filter_mode(level_meta):
-    """根据输入参数有关日期字段名称判断循环模式"""
-    api_level = level_meta['api_level']
-    para_list = level_meta['inputParameter']
-    f_names = [d['fieldName']
-               for d in para_list if DT_PAT.findall(d['fieldName'])]
-    if len(f_names) == 0:
-        return None
-    elif 'syear' in f_names:
-        return 'YY'
-    elif 'rdate' in f_names:
-        return 'QQ'
-    # 其实此算法并不一定正确，只是目前找不到相应规律
-    # 放在最后确保最大程度减少失误
-    # 数据浏览器凡是三层菜单，都是年季输入
-    if len(api_level) == 3:
-        return 'QQ'
-    else:
-        return 'DD'
 
 
 def clear_date(self):
@@ -142,12 +208,15 @@ def clear_date(self):
     simulated_click(self, elem)
 
 
-def datepicker(self, date_str, css):
+def datepicker(self, date_str, css, use_tab=True):
     """设定查询日期"""
     elem = self.driver.find_element_by_css_selector(css)
     elem.click()
     clear_date(self)
-    elem.send_keys(date_str, Keys.TAB)
+    if use_tab:
+        elem.send_keys(date_str, Keys.TAB)
+    else:
+        elem.send_keys(date_str)
     # 合理等待响应
     self.driver.implicitly_wait(0.2)
 
@@ -227,6 +296,10 @@ def input_code(self, code):
         raise ValueError(f"无效股票代码{code}")
     result[0].click()
 
+# endregion
+
+# region 解析输出结果
+
 
 def parse_response(self, request):
     """解析指定请求的响应数据
@@ -239,7 +312,9 @@ def parse_response(self, request):
     if response is None:
         return res
     if response.status_code == 200:
-        body = request._client.get_response_body(request.id)
+        # 同上说明
+        # body = request._client.get_response_body(request.id)
+        body = request.response.body
         data = json.loads(body)
         # 解析结果 402 不合法的参数
         if data['resultcode'] == 200:
@@ -248,22 +323,51 @@ def parse_response(self, request):
     return res
 
 
+def is_target_request(self, request, api_path):
+    """判断网址是否为目标请求"""
+    filter_pattern = self._filter_pattern
+    if not filter_pattern:
+        return api_path in request.url
+    # 网址模式匹配
+    # pattern = '(.*?)?'.join([f"{k}={v}" for k, v in filter_pattern.items()])
+    # pattern = re.compile(f"{api_path}?(.*?)?{pattern}")
+    # return re.match(pattern, url) is not None
+    d = request.params
+    if api_path in request.url:
+        try:
+            cond = all([d[k] == v for k, v in filter_pattern.items()])
+            return cond
+        except KeyError:
+            return False
+    else:
+        return False
+
+
 def find_data_requests(self, level):
+    """查找数据目标请求"""
+    # 使用url作为键，避免重复采集发出的请求
     requests = {}
     api_path = self.get_level_meta_data(level)['api_path']
-    api_key = api_path.replace("http://webapi.cninfo.com.cn", '')
     for r in self.driver.requests:
-        if r.method == 'POST' and api_key in r.path:
+        if r.method == 'POST' and is_target_request(self, r, api_path):
             requests[r.url] = r
+        else:
+            # 确保只保留目标数据的请求
+            del r
     return requests.values()
 
 
 def read_json_data(self, level):
-    """解析查询数据"""
+    """解析查询命令返回的数据"""
     data = []
     requests = find_data_requests(self, level)
-    for r in requests:
-        data.extend(parse_response(self, r))
+    for request in requests:
+        # 在读取数据前必须确定完成加载
+        # request = self.driver.wait_for_request(r.path)
+        docs = parse_response(self, request)
+        data.extend(docs)
     # 删除已经读取的请求
     del self.driver.requests
     return data
+
+# endregion

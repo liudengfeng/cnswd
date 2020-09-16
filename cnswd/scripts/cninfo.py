@@ -66,12 +66,6 @@ def get_start(coll):
         return max_dt + pd.Timedelta(days=1)
 
 
-def _find_level(name, infoes):
-    for d in infoes:
-        if d.name == name:
-            return d.pos
-
-
 def create_index_for(coll):
     name = coll.name
     dt_field = CN_INFO_CONFIG[name][1]
@@ -93,8 +87,7 @@ def refresh_margin():
             api.logger.info(f"为集合'{name}'创建索引")
             # 创建索引
             create_index_for(coll)
-        infoes = api.levels
-        level = _find_level(name, infoes)
+        level = api.name_to_level(name)
         if level != '82':
             api.logger.exception(f"web api 已经更改，退出系统")
             sys.exit()
@@ -143,13 +136,12 @@ def _refresh(coll, api, t1, t2):
 def refresh_asr(items):
     """刷新数据浏览器项目数据"""
     with AdvanceSearcher() as api:
-        infoes = api.levels
-        for info in infoes:
-            level = info.pos
-            name = info.name
+        pos_list = api.pos_list
+        for pos in pos_list:
+            name = api.level_to_name(pos)
             if name not in items:
                 continue
-            api.to_level(level)
+            api.to_level(pos)
             coll = get_coll(name)
             if not coll.estimated_document_count() > 0:
                 api.logger.info(f"为集合'{name}'创建索引")
