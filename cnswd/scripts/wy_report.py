@@ -1,18 +1,17 @@
 import re
 import time
-from multiprocessing import Pool
-
+from functools import partial
+from multiprocessing import Manager, Pool
+from toolz.dicttoolz import valfilter
 import pandas as pd
-
+from itertools import product
 from cnswd.mongodb import get_db
 from cnswd.setting.constants import MARKET_START, MAX_WORKER
 from cnswd.utils import make_logger
 from cnswd.websource.tencent import get_recent_trading_stocks
 from cnswd.websource.wy import fetch_financial_report
 
-
 logger = make_logger('网易')
-
 
 NAMES = {'zcfzb': '资产负债表', 'lrb': '利润表', 'xjllb': '现金流量表'}
 START = MARKET_START.tz_localize(None)
@@ -64,13 +63,15 @@ def _droped_null(doc):
     return res
 
 
-def _refresh(code):
+def _refresh(code, d):
     db = get_db('wy')
     for key, name in NAMES.items():
+        if d.get((code, key), False):
+            continue
         try:
             df = fetch_financial_report(code, key)
-        except (ValueError, KeyError):
-            return
+        except (ValueError,):
+            continue
         df['股票代码'] = code
         df[DATE_KEY] = pd.to_datetime(df[DATE_KEY], errors='ignore')
         collection = db[name]
@@ -80,11 +81,39 @@ def _refresh(code):
         if not df.empty:
             for doc in df.to_dict('records'):
                 collection.insert_one(_droped_null(doc))
+        logger.info(f"完成股票 {code} {name} 刷新")
+        d[(code, key)] = True
 
 
 def refresh():
     t = time.time()
     codes = get_recent_trading_stocks()
-    with Pool(MAX_WORKER) as pool:
-        list(pool.imap_unordered(_refresh, codes))
+    # 单进程
+    # d = {}
+    # for _ in range(30):
+    #     func = partial(_refresh, d=d)
+    #     for code in codes:
+    #         try:
+    #             func(code)
+    #             logger.info(code)
+    #         except Exception as e:
+    #             logger.error(f"{e}")
+    #             time.sleep(30)
+    # logger.info(f"股票数量 {len(codes)}, 用时 {time.time() - t:.2f}秒")
+    # 多进程
+    with Manager() as manager:
+        d = manager.dict()
+        for k in product(codes, NAMES.keys()):
+            d[k] = False
+        func = partial(_refresh, d=d)
+        for _ in range(10):
+            try:
+                with Pool(MAX_WORKER) as pool:
+                    list(pool.imap_unordered(func, codes))
+            except Exception as e:
+                logger.error(f"{e}")
+                time.sleep(30)
+        failed = valfilter(lambda x: x == False, d)
+        print(f"失败数量：{len(failed)}")
+        print(f"股票代码 {failed} ")
     logger.info(f"股票数量 {len(codes)}, 用时 {time.time() - t:.2f}秒")
