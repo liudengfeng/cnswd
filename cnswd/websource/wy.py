@@ -46,8 +46,12 @@ _CJMX_COLS = ('时间', '价格', '涨跌额', '成交量', '成交额', '方向
 
 _WY_MARGIN_DATA_USE_COLS = [1, 4, 5, 6, 7, 8, 9, 10, 11]
 _WY_MARGIN_DATA_COL_NAMES = [
-    '股票代码', '融资余额', '融资买入额', '融资偿还额', '融券余量', '融券卖出量', '融券偿还量', '融券余量金额',
+    '股票代码', '融资余额', '融资买入额', '融资偿还额', '融券余量', '融券卖出量', '融券偿还量', '融券余量金额', ''
     '融券余额'
+]
+_WY_FH_COLS = [
+    '公告日期', '分红年度', '送股(每10股)', '转增(每10股)', '派息(每10股)',
+    '股权登记日', '除权除息日', '红股上市日'
 ]
 
 MARGIN_START = pd.Timestamp('2010-3-31').date()
@@ -179,6 +183,24 @@ def fetch_cjmx(code, tdate):
     df.insert(0, '日期', tdate)
     df.insert(0, '股票代码', code)
     return df
+
+
+def fetch_fhpg(code):
+    """股票分红配股数据
+
+    返回：
+        list
+        0： 分红配股
+        1： 配股一览
+        2： 增发一览
+        3： 历年融资计划
+    """
+    url = f'http://quotes.money.163.com/f10/fhpg_{code}.html#01d05'
+    r = requests.get(url)
+    attrs = {'class': 'table_bg001 border_box limit_sale'}
+    dfs = pd.read_html(r.text, attrs=attrs, na_values=['--', '暂无数据'])
+    dfs[0].columns = _WY_FH_COLS
+    return dfs
 
 
 def _cwzb_url(code, type, part):

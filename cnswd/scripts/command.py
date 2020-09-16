@@ -17,7 +17,7 @@ import pandas as pd
 
 from ..cninfo import ASR_KEYS
 from ..utils import kill_firefox, remove_temp_files
-from . import (cninfo, cninfo_meta, classify, disclosure, sina_news, yahoo,
+from . import (cninfo, cninfo_meta, classify, disclosure, sina_news, yahoo, wy_fhpg,
                sina_quote, tct_gn, tct_minutely, ths_gn, ths_news, wy_cjmx,
                wy_index, wy_stock, trading_calendar, trading_codes, treasury)
 
@@ -147,6 +147,12 @@ def wyi():
 
 
 @stock.command()
+def wyfhpg():
+    """刷新【网易】股票分红配股数据"""
+    wy_fhpg.refresh()
+
+
+@stock.command()
 def cjmx():
     """刷新【网易】近期成交明细"""
     # before_refresh()
@@ -171,8 +177,7 @@ def tctm():
     multiple=True,
     default=ASR_KEYS,
     type=click.Choice(ASR_KEYS, case_sensitive=False),
-    help=
-    '深证信高级搜索项目数据。指定多项目 stock asr --items=基本资料 --items=个股报告期利润表 \n 全部项目 stock asr',
+    help='深证信高级搜索项目数据。指定多项目 stock asr --items=基本资料 --items=个股报告期利润表 \n 全部项目 stock asr',
 )
 def asr(items):
     """刷新【深证信】数据浏览项目数据"""
