@@ -5,24 +5,26 @@ from multiprocessing import Pool
 import pandas as pd
 
 from cnswd.mongodb import get_db
-from cnswd.websource.wy import fetch_fhpg
+from cnswd.setting.constants import MARKET_START, MAX_WORKER
+from cnswd.utils import make_logger
+from cnswd.websource.tencent import get_recent_trading_stocks
+from cnswd.websource.wy import fetch_financial_report
 
-from ..setting.constants import MARKET_START, MAX_WORKER
-from ..utils import make_logger
-from ..websource.tencent import get_recent_trading_stocks
 
 logger = make_logger('网易')
-NAMES = ['分红配股', '配股一览', '增发一览', '历年融资计划']
-D_PAT = re.compile('日期$|日$')
+
+
+NAMES = {'zcfzb': '资产负债表', 'lrb': '利润表', 'xjllb': '现金流量表'}
 START = MARKET_START.tz_localize(None)
+DATE_KEY = '报告日期'
 
 
 def create_index_for(collection):
     # 不存在索性信息时，创建索引
     if not collection.index_information():
-        collection.create_index([("公告日期", 1)])
-        collection.create_index([("股票代码", 1)])
-        collection.create_index([("公告日期", 1), ("股票代码", 1)])
+        # collection.create_index([("公告日期", 1)])
+        # collection.create_index([("股票代码", 1)])
+        collection.create_index([(DATE_KEY, 1), ("股票代码", 1)])
 
 
 def get_max_dt(collection, code):
@@ -33,13 +35,13 @@ def get_max_dt(collection, code):
         },
         {
             '$sort': {
-                '公告日期': -1
+                DATE_KEY: -1
             }
         },
         {
             '$project': {
                 '_id': 0,
-                '公告日期': 1
+                DATE_KEY: 1
             }
         },
         {
@@ -48,19 +50,10 @@ def get_max_dt(collection, code):
     ]
     try:
         res = list(collection.aggregate(pipe))[0]
-        dt = pd.Timestamp(res['公告日期'])
+        dt = pd.Timestamp(res[DATE_KEY])
         return dt
     except (IndexError, ):
         return START
-
-
-def _fix_data(df):
-    if df.empty:
-        return df
-    for col in df.columns:
-        if D_PAT.findall(col):
-            df[col] = pd.to_datetime(df[col], errors='ignore')
-    return df
 
 
 def _droped_null(doc):
@@ -73,19 +66,17 @@ def _droped_null(doc):
 
 def _refresh(code):
     db = get_db('wy')
-    try:
-        dfs = fetch_fhpg(code)
-    except ValueError:
-        return
-    for name, df in zip(NAMES, dfs):
-        if df.empty:
-            continue
+    for key, name in NAMES.items():
+        try:
+            df = fetch_financial_report(code, key)
+        except (ValueError, KeyError):
+            return
         df['股票代码'] = code
-        df = _fix_data(df)
+        df[DATE_KEY] = pd.to_datetime(df[DATE_KEY], errors='ignore')
         collection = db[name]
         create_index_for(collection)
         last_dt = get_max_dt(collection, code)
-        df = df[df['公告日期'] > last_dt]
+        df = df[df[DATE_KEY] > last_dt]
         if not df.empty:
             for doc in df.to_dict('records'):
                 collection.insert_one(_droped_null(doc))

@@ -149,7 +149,6 @@ def fetch_last_history():
         区别于fetch_history，用于提取全部股票最新的日线交易数据。
     """
     url = "http://quotes.money.163.com/hs/service/diyrank.php?"
-    # url += "host=http://quotes.money.163.com/hs/service/diyrank.php&"
     url += "page=0&query=STYPE:EQA&fields=SYMBOL,NAME,PRICE,PERCENT,OPEN,YESTCLOSE,"
     url += "HIGH,LOW,VOLUME,TURNOVER,PE,MCAP,TCAP&sort=PERCENT&"
     url += "order=desc&count=5000&type=query"
@@ -215,12 +214,6 @@ def _cwzb_url(code, type, part):
     return url
 
 
-def _report_url(code, type_, report):
-    """财务报告网址"""
-    url_fmt = 'http://quotes.money.163.com/service/{}_{}.html?type={}'
-    return url_fmt.format(report, code, type_)
-
-
 def _parse_report_data(url):
     response = get_page_response(url)
     #response.encoding = 'gb2312'
@@ -235,12 +228,6 @@ def fetch_financial_indicator(code, report_type, part):
     """
     财务指标
     ---------------
-        类别：
-            report_type      含义
-            ———————————      ———————
-            report           按报告期
-            year             按年度
-            season           按单季度
         项目：
             part             含义
             ————————         ——————
@@ -252,23 +239,17 @@ def fetch_financial_indicator(code, report_type, part):
     """
     assert report_type in ('report', 'year', 'season')
     assert part in ('zhzb', 'ylnl', 'chnl', 'cznl', 'yynl')
-    url = _cwzb_url(code, report_type, part)
+    url = 'http://quotes.money.163.com/service/{report}_603023.html'
     data = pd.read_csv(url, na_values=['--', ' --', '-- '],
                        encoding='gb2312').iloc[:, :-1]
     return data
 
 
 @friendly_download()
-def fetch_financial_report(code, report_type, report_item):
+def fetch_financial_report(code, report_item):
     """
     财务报表
     ---------------
-        类别：
-            report_type     含义
-            ———————————     ———————
-            report          按报告期
-            year            按年度
-
         项目：
             report_item     含义
             ———————————     ———————
@@ -276,12 +257,14 @@ def fetch_financial_report(code, report_type, report_item):
             zcfzb           资产负债表
             xjllb           现金流量表
     """
-    assert report_type in ('report', 'year')
     assert report_item in ('lrb', 'zcfzb', 'xjllb')
-    url = _report_url(code, report_type, report_item)
-    data = pd.read_csv(url, na_values=['--', ' --', '-- '],
-                       encoding='gb18030').iloc[:, :-1]
-    return data
+    date_key = '报告日期'
+    url = f'http://quotes.money.163.com/service/{report_item}_{code}.html'
+    df = pd.read_csv(url, na_values=['--', ' --', '-- '],
+                     encoding='gb18030').iloc[:, :-1]
+    df.columns = [str(c).strip() for c in df.columns]
+    df.set_index(date_key, inplace=True)
+    return df.T.reset_index().rename(columns={'index': date_key})
 
 
 def _parse_performance_notice(raw_df):

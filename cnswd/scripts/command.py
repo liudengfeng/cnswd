@@ -18,7 +18,7 @@ import pandas as pd
 from ..cninfo import ASR_KEYS
 from ..utils import kill_firefox, remove_temp_files
 from . import (cninfo, cninfo_meta, classify, disclosure, sina_news, yahoo, wy_fhpg,
-               sina_quote, tct_gn, tct_minutely, ths_gn, ths_news, wy_cjmx,
+               sina_quote, tct_gn, tct_minutely, ths_gn, ths_news, wy_cjmx, wy_report,
                wy_index, wy_stock, trading_calendar, trading_codes, treasury)
 
 
@@ -150,6 +150,12 @@ def wyi():
 def wyfhpg():
     """刷新【网易】股票分红配股数据"""
     wy_fhpg.refresh()
+
+
+@stock.command()
+def wycwbg():
+    """刷新【网易】股票财务三张表报告"""
+    wy_report.refresh()
 
 
 @stock.command()
