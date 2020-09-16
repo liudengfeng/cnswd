@@ -1,10 +1,13 @@
 import re
 import time
 from functools import partial
-from multiprocessing import Manager, Pool
-from toolz.dicttoolz import valfilter
-import pandas as pd
 from itertools import product
+from multiprocessing import Manager, Pool
+
+import pandas as pd
+from numpy.random import shuffle
+from toolz.dicttoolz import valfilter
+
 from cnswd.mongodb import get_db
 from cnswd.setting.constants import MARKET_START, MAX_WORKER
 from cnswd.utils import make_logger
@@ -88,6 +91,7 @@ def _refresh(code, d):
 def refresh():
     t = time.time()
     codes = get_recent_trading_stocks()
+    shuffle(codes)
     # 单进程
     # d = {}
     # for _ in range(30):
@@ -106,7 +110,7 @@ def refresh():
         for k in product(codes, NAMES.keys()):
             d[k] = False
         func = partial(_refresh, d=d)
-        for _ in range(10):
+        for _ in range(30):
             try:
                 with Pool(MAX_WORKER) as pool:
                     list(pool.imap_unordered(func, codes))
@@ -115,5 +119,5 @@ def refresh():
                 time.sleep(30)
         failed = valfilter(lambda x: x == False, d)
         print(f"失败数量：{len(failed)}")
-        print(f"股票代码 {failed} ")
+        # print(f"失败项目 {failed} ")
     logger.info(f"股票数量 {len(codes)}, 用时 {time.time() - t:.2f}秒")
