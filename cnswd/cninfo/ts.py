@@ -45,7 +45,7 @@ class ThematicStatistics(SZXPage):
         # 默认以季度循环
         if period_type == 'BD':
             datepicker(self, t1, self.css.sdate, use_tab=False)
-            self._filter_pattern['tdate'] = t1
+            self._filter_pattern['tdate'] = str(t1)
 
         # if period_type == 'QD':
         #     css_1 = "input.date:nth-child(1)"

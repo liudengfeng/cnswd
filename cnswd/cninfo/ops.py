@@ -221,10 +221,25 @@ def datepicker(self, date_str, css, use_tab=True):
     self.driver.implicitly_wait(0.2)
 
 
-def select_year(self, year):
-    js = "arguments[0].setAttribute('value', arguments[1]);"
-    elem = self.driver.find_element_by_css_selector(self.css.select_year)
-    self.driver.execute_script(js, elem, year)
+# def select_year(self, year, css=None):
+#     js = "arguments[0].setAttribute('value', arguments[1]);"
+#     # YQ -> '#se1_sele'
+#     # YY -> '#se2_sele'
+#     if css is None:
+#         css = self.css.select_year
+#     elem = self.driver.find_element_by_css_selector(css)
+#     self.driver.execute_script(js, elem, str(year))
+
+
+def select_year(self, year, css=None):
+    # YQ -> '#se1_sele'
+    # YY -> '#se2_sele'
+    if css is None:
+        css = self.css.select_year
+    elem = self.driver.find_element_by_css_selector(css)
+    elem.clear()
+    elem.send_keys(str(year))
+    # self.driver.save_screenshot(f"{year}.png")
 
 
 def select_quarter(self, q):

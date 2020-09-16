@@ -6,6 +6,7 @@ from multiprocessing import Manager, Pool
 
 import pandas as pd
 from numpy.random import shuffle
+from toolz import partition_all
 from toolz.dicttoolz import valfilter
 
 from cnswd.mongodb import get_db
@@ -27,6 +28,19 @@ def create_index_for(collection):
         # collection.create_index([("公告日期", 1)])
         # collection.create_index([("股票代码", 1)])
         collection.create_index([(DATE_KEY, 1), ("股票代码", 1)])
+
+
+def need_refresh(collection, code):
+    """是否需要刷新
+
+    简单规则：
+        如果已经存在数据，且24小时内已经刷新 ❌ 否则 ✔
+    """
+    now = pd.Timestamp('now')
+    doc = collection.find_one({'股票代码': code})
+    if doc and now - doc['更新时间'] < pd.Timedelta(days=1):
+        return False
+    return True
 
 
 def get_max_dt(collection, code):
@@ -66,58 +80,56 @@ def _droped_null(doc):
     return res
 
 
-def _refresh(code, d):
+def _refresh(batch, d):
     db = get_db('wy')
     for key, name in NAMES.items():
-        if d.get((code, key), False):
-            continue
-        try:
-            df = fetch_financial_report(code, key)
-        except (ValueError,):
-            continue
-        df['股票代码'] = code
-        df[DATE_KEY] = pd.to_datetime(df[DATE_KEY], errors='ignore')
         collection = db[name]
-        create_index_for(collection)
-        last_dt = get_max_dt(collection, code)
-        df = df[df[DATE_KEY] > last_dt]
-        if not df.empty:
-            for doc in df.to_dict('records'):
-                collection.insert_one(_droped_null(doc))
-        logger.info(f"完成股票 {code} {name} 刷新")
-        d[(code, key)] = True
+        for code in batch:
+            # 首先检查状态，减少数据库查询
+            if d.get((code, key), False):
+                continue
+            if not need_refresh(collection, code):
+                d[(code, key)] = True
+                logger.info(f"股票 {code} {name:>7} 已经刷新")
+                continue
+            try:
+                df = fetch_financial_report(code, key)
+            except (ValueError,):
+                continue
+            df['股票代码'] = code
+            df[DATE_KEY] = pd.to_datetime(df[DATE_KEY], errors='ignore')
+            create_index_for(collection)
+            last_dt = get_max_dt(collection, code)
+            df = df[df[DATE_KEY] > last_dt]
+            if not df.empty:
+                for doc in df.to_dict('records'):
+                    doc['更新时间'] = pd.Timestamp('now')
+                    collection.insert_one(_droped_null(doc))
+            logger.info(f"完成股票 {code} {name:>7} 刷新")
+            d[(code, key)] = True
 
 
 def refresh():
     t = time.time()
     codes = get_recent_trading_stocks()
     shuffle(codes)
-    # 单进程
-    # d = {}
-    # for _ in range(30):
-    #     func = partial(_refresh, d=d)
-    #     for code in codes:
-    #         try:
-    #             func(code)
-    #             logger.info(code)
-    #         except Exception as e:
-    #             logger.error(f"{e}")
-    #             time.sleep(30)
-    # logger.info(f"股票数量 {len(codes)}, 用时 {time.time() - t:.2f}秒")
+    # 约4000只股票，每批300只
+    batches = partition_all(300, codes)
+
     # 多进程
     with Manager() as manager:
         d = manager.dict()
         for k in product(codes, NAMES.keys()):
             d[k] = False
         func = partial(_refresh, d=d)
-        for _ in range(30):
+        for _ in range(100):
             try:
                 with Pool(MAX_WORKER) as pool:
-                    list(pool.imap_unordered(func, codes))
+                    list(pool.imap_unordered(func, batches))
             except Exception as e:
                 logger.error(f"{e}")
                 time.sleep(30)
         failed = valfilter(lambda x: x == False, d)
-        print(f"失败数量：{len(failed)}")
+        logger.warning(f"失败数量：{len(failed)}")
         # print(f"失败项目 {failed} ")
     logger.info(f"股票数量 {len(codes)}, 用时 {time.time() - t:.2f}秒")

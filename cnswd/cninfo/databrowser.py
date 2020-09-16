@@ -82,10 +82,10 @@ class DataBrowser(SZXPage):
         if dt_fmt == 'D':
             if t1:
                 datepicker(self, t1, self.css.sdate)
-                self._filter_pattern['sdate'] = t1
+                self._filter_pattern['sdate'] = str(t1)
             if t2:
                 datepicker(self, t2, self.css.edate)
-                self._filter_pattern['edate'] = t2
+                self._filter_pattern['edate'] = str(t2)
         # 年 季度
         if t1 and dt_fmt == 'Q':
             select_year(self, t1)
@@ -96,8 +96,9 @@ class DataBrowser(SZXPage):
         # 年
         if t1 and dt_fmt == 'Y':
             # 特殊
-            select_year(self, t1)
-            self._filter_pattern['syear'] = t1
+            css = '#se2_sele'
+            select_year(self, t1, css)
+            self._filter_pattern['syear'] = str(t1)
 
     def _before_read(self):
         locator = (By.CSS_SELECTOR, self.css.data_loaded)
