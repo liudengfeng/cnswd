@@ -15,7 +15,7 @@ from cnswd.utils import make_logger
 from cnswd.websource.tencent import get_recent_trading_stocks
 from cnswd.websource.wy import fetch_financial_report
 
-logger = make_logger('网易')
+logger = make_logger('网易财务分析')
 
 NAMES = {'zcfzb': '资产负债表', 'lrb': '利润表', 'xjllb': '现金流量表'}
 START = MARKET_START.tz_localize(None)
@@ -122,7 +122,7 @@ def refresh():
         for k in product(codes, NAMES.keys()):
             d[k] = False
         func = partial(_refresh, d=d)
-        for _ in range(100):
+        for _ in range(10):
             try:
                 with Pool(MAX_WORKER) as pool:
                     list(pool.imap_unordered(func, batches))

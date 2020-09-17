@@ -11,7 +11,7 @@ from ..setting.constants import MARKET_START, MAX_WORKER
 from ..utils import make_logger
 from ..websource.tencent import get_recent_trading_stocks
 
-logger = make_logger('网易')
+logger = make_logger('网易分红配股')
 NAMES = ['分红配股', '配股一览', '增发一览', '历年融资计划']
 D_PAT = re.compile('日期$|日$')
 START = MARKET_START.tz_localize(None)

@@ -53,7 +53,7 @@ _WY_FH_COLS = [
     '公告日期', '分红年度', '送股(每10股)', '转增(每10股)', '派息(每10股)',
     '股权登记日', '除权除息日', '红股上市日'
 ]
-
+S_PAT = re.compile(r"\s")
 MARGIN_START = pd.Timestamp('2010-3-31').date()
 
 
@@ -299,13 +299,25 @@ def fetch_performance_notice(stock_code, output_type='list'):
         return df
 
 
+def _table_to_dict(html, td_css):
+    """以键值对形式存在的网页表格解析为字典"""
+    soup = BeautifulSoup(html, 'lxml')
+    tds = soup.select(td_css)
+    labels = [S_PAT.sub('', e.text) for e in tds[::2]]
+    values = [S_PAT.sub('', e.text) for e in tds[1::2]]
+    return {k: v for k, v in zip(labels, values)}
+
+
 def fetch_company_info(stock_code):
-    """获取公司简介、IPO信息（作为巨潮公司简要信息的补充）"""
-    url_fmt = 'http://quotes.money.163.com/f10/gszl_{}.html'
+    """获取公司简介、IPO信息字典"""
+    url_fmt = 'http://quotes.money.163.com/f10/gszl_{}.html#11b01'
     url = url_fmt.format(stock_code)
-    attrs = {'class': 'table_bg001 border_box limit_sale table_details'}
-    res = pd.read_html(url, attrs=attrs)
-    return res[0], res[1]
+    r = requests.get(url)
+    tb_1_td_css = '.col_l_01 > table:nth-child(3) td'
+    tb_2_td_css = '.col_r_01 > table:nth-child(3) td'
+    tb1 = _table_to_dict(r.text, tb_1_td_css)
+    tb2 = _table_to_dict(r.text, tb_2_td_css)
+    return tb1, tb2
 
 
 @lru_cache(None)

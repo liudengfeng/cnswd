@@ -17,9 +17,10 @@ import pandas as pd
 
 from ..cninfo import ASR_KEYS
 from ..utils import kill_firefox, remove_temp_files
-from . import (cninfo, cninfo_meta, classify, disclosure, sina_news, yahoo, wy_fhpg, sw_class,
-               sina_quote, tct_gn, tct_minutely, ths_gn, ths_news, wy_cjmx, wy_report,
-               wy_index, wy_stock, trading_calendar, trading_codes, treasury)
+from . import (classify, cninfo, cninfo_meta, disclosure, sina_news,
+               sina_quote, sw_class, tct_gn, tct_minutely, ths_gn, ths_news,
+               trading_calendar, trading_codes, treasury, wy_cjmx, wy_gszl,
+               wy_fhpg, wy_index, wy_report, wy_stock, yahoo)
 
 
 @click.group()
@@ -156,6 +157,12 @@ def wyfhpg():
 def wycwbg():
     """刷新【网易】股票财务三张表报告"""
     wy_report.refresh()
+
+
+@stock.command()
+def wygszl():
+    """刷新【网易】公司简介"""
+    wy_gszl.refresh()
 
 
 @stock.command()
