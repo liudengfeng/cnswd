@@ -55,6 +55,7 @@ class SZXPage(object):
         self.logger = make_logger(self.api_name)
         self.logger.info("生成无头浏览器")
         self._meta_data = {}
+        self._pos = ''
 
     def __enter__(self):
         return self
@@ -123,13 +124,11 @@ class SZXPage(object):
         Args:
             level (str): 指定菜单层级
         """
-        pos_list = self.pos_list
-        if level == pos_list[0]:
-            return self.current_menu
-        # 初始化菜单
-        if self.current_menu.pos != level:
+        if self._pos != level:
             self.ensure_init()
-            return parse_menu_info(find_menu(self, level))
+            menu = parse_menu_info(find_menu(self, level))
+            self._pos = level
+            return menu
         return self.current_menu
 
     def get_level_meta_data(self, level):
