@@ -26,5 +26,5 @@ def to_dict(df):
     Returns:
         DataFram: 字典格式数据
     """
-    data = df.to_dict('record')
+    data = df.to_dict('records')
     return list(map(ingnore_null_dict, data))

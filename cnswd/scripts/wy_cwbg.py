@@ -12,8 +12,9 @@ from toolz.dicttoolz import valfilter
 from cnswd.mongodb import get_db
 from cnswd.setting.constants import MARKET_START, MAX_WORKER
 from cnswd.utils import make_logger
-from cnswd.websource.tencent import get_recent_trading_stocks
 from cnswd.websource.wy import fetch_financial_report
+
+from .base import get_stock_status
 
 logger = make_logger('网易财务分析')
 
@@ -94,8 +95,15 @@ def _refresh(batch, d):
                 continue
             try:
                 df = fetch_financial_report(code, key)
-            except (ValueError,):
+            except (ValueError, KeyError):
+                # 网页不存在时发生，忽略
+                # 标注为完成状态
+                d[(code, key)] = True
                 continue
+            except Exception as e:
+                logger.error(f"股票 {code} {name:>7} 失败 {e}")
+                continue
+            # 正常情形下运行以下代码
             df['股票代码'] = code
             df[DATE_KEY] = pd.to_datetime(df[DATE_KEY], errors='ignore')
             create_index_for(collection)
@@ -111,7 +119,7 @@ def _refresh(batch, d):
 
 def refresh():
     t = time.time()
-    codes = get_recent_trading_stocks()
+    codes = list(get_stock_status().keys())
     shuffle(codes)
     # 约4000只股票，每批300只
     batches = partition_all(300, codes)

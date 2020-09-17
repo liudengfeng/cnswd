@@ -1,16 +1,17 @@
 import time
 from multiprocessing import Pool
 from random import shuffle
+
 import pandas as pd
 from retry.api import retry_call
 
+from .._exceptions import ConnectFailed
 from ..mongodb import get_db
 from ..setting.constants import MARKET_START, MAX_WORKER
 from ..utils import ensure_dtypes, make_logger
 from ..utils.db_utils import to_dict
-from ..websource.tencent import get_recent_trading_stocks
 from ..websource.wy import fetch_history
-from .._exceptions import ConnectFailed
+from .base import get_stock_status
 
 logger = make_logger('网易股票日线')
 db_name = "wy_stock_daily"
@@ -87,7 +88,8 @@ def _one(code):
 
 def refresh():
     t = time.time()
-    codes = get_recent_trading_stocks()
+    # 在市交易股票
+    codes = [code for code, dt in get_stock_status().items() if dt is None]
     shuffle(codes)
     for _ in range(3):
         with Pool(MAX_WORKER) as pool:

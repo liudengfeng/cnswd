@@ -20,7 +20,7 @@ from ..utils import kill_firefox, remove_temp_files
 from . import (classify, cninfo, cninfo_meta, disclosure, sina_news,
                sina_quote, sw_class, tct_gn, tct_minutely, ths_gn, ths_news,
                trading_calendar, trading_codes, treasury, wy_cjmx, wy_gszl,
-               wy_fhpg, wy_index, wy_report, wy_stock, yahoo)
+               wy_fhpg, wy_index, wy_cwbg, wy_stock, yahoo)
 
 
 @click.group()
@@ -156,7 +156,7 @@ def wyfhpg():
 @stock.command()
 def wycwbg():
     """刷新【网易】股票财务三张表报告"""
-    wy_report.refresh()
+    wy_cwbg.refresh()
 
 
 @stock.command()

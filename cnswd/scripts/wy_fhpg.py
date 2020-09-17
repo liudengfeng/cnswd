@@ -9,7 +9,7 @@ from cnswd.websource.wy import fetch_fhpg
 
 from ..setting.constants import MARKET_START, MAX_WORKER
 from ..utils import make_logger
-from ..websource.tencent import get_recent_trading_stocks
+from .base import get_stock_status
 
 logger = make_logger('网易分红配股')
 NAMES = ['分红配股', '配股一览', '增发一览', '历年融资计划']
@@ -93,7 +93,7 @@ def _refresh(code):
 
 def refresh():
     t = time.time()
-    codes = get_recent_trading_stocks()
+    codes = get_stock_status().keys()
     with Pool(MAX_WORKER) as pool:
         list(pool.imap_unordered(_refresh, codes))
     logger.info(f"股票数量 {len(codes)}, 用时 {time.time() - t:.2f}秒")
