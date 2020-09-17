@@ -219,6 +219,7 @@ def datepicker(self, date_str, css, use_tab=True):
         elem.send_keys(date_str)
     # 合理等待响应
     self.driver.implicitly_wait(0.2)
+    # self.driver.save_screenshot(f"{date_str}.png")
 
 
 # def select_year(self, year, css=None):
@@ -239,7 +240,6 @@ def select_year(self, year, css=None):
     elem = self.driver.find_element_by_css_selector(css)
     elem.clear()
     elem.send_keys(str(year))
-    # self.driver.save_screenshot(f"{year}.png")
 
 
 def select_quarter(self, q):
@@ -366,9 +366,6 @@ def find_data_requests(self, level):
     for r in self.driver.requests:
         if r.method == 'POST' and is_target_request(self, r, api_path):
             requests[r.url] = r
-        else:
-            # 确保只保留目标数据的请求
-            del r
     return requests.values()
 
 

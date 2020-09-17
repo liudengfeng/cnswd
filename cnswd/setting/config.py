@@ -16,7 +16,7 @@ DEFAULT_CONFIG = {
 }
 
 LOG_TO_FILE = False        # 是否将日志写入到文件
-TIMEOUT = 60               # 最长等待时间，单位：秒。>20秒
+TIMEOUT = 90               # 最长等待时间，单位：秒。>20秒
 # 轮询时间缩短
 POLL_FREQUENCY = 0.2
 
