@@ -17,7 +17,7 @@ import pandas as pd
 
 from ..cninfo import ASR_KEYS
 from ..utils import kill_firefox, remove_temp_files
-from . import (cninfo, cninfo_meta, classify, disclosure, sina_news, yahoo, wy_fhpg,
+from . import (cninfo, cninfo_meta, classify, disclosure, sina_news, yahoo, wy_fhpg, sw_class,
                sina_quote, tct_gn, tct_minutely, ths_gn, ths_news, wy_cjmx, wy_report,
                wy_index, wy_stock, trading_calendar, trading_codes, treasury)
 
@@ -194,8 +194,14 @@ def asr(items):
 
 @stock.command()
 def yh():
-    """刷新雅虎财经数据"""
+    """刷新【雅虎】财经数据"""
     yahoo.refresh()
+
+
+@stock.command()
+def swclass():
+    """刷新【申万】行业分类"""
+    sw_class.refresh()
 
 
 # endregion
