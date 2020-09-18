@@ -148,6 +148,7 @@ def fetch_last_history():
     注意：
         区别于fetch_history，用于提取全部股票最新的日线交易数据。
     """
+    # TODO:部分字段值有错误！日期？
     url = "http://quotes.money.163.com/hs/service/diyrank.php?"
     url += "page=0&query=STYPE:EQA&fields=SYMBOL,NAME,PRICE,PERCENT,OPEN,YESTCLOSE,"
     url += "HIGH,LOW,VOLUME,TURNOVER,PE,MCAP,TCAP&sort=PERCENT&"
@@ -202,18 +203,6 @@ def fetch_fhpg(code):
     return dfs
 
 
-def _cwzb_url(code, type, part):
-    """财务指标网址
-    """
-    url_fmt1 = 'http://quotes.money.163.com/service/zycwzb_{}.html?type={}'
-    url_fmt2 = url_fmt1 + '&part={}'
-    if part == 'zhzb':
-        url = url_fmt1.format(code, type)
-    else:
-        url = url_fmt2.format(code, type, part)
-    return url
-
-
 def _parse_report_data(url):
     response = get_page_response(url)
     #response.encoding = 'gb2312'
@@ -223,26 +212,35 @@ def _parse_report_data(url):
                        na_values=na_values).iloc[:, :-1]
 
 
-@friendly_download()
-def fetch_financial_indicator(code, report_type, part):
+# @friendly_download()
+def fetch_financial_indicator(code, type_, part):
     """
-    财务指标
+    主要财务指标
     ---------------
         项目：
             part             含义
             ————————         ——————
-            zhzb             综合指标
+            zycwzb           主要财务指标
             ylnl             盈利能力
             chnl             偿还能力
             cznl             成长能力
             yynl             营运能力
     """
-    assert report_type in ('report', 'year', 'season')
-    assert part in ('zhzb', 'ylnl', 'chnl', 'cznl', 'yynl')
-    url = 'http://quotes.money.163.com/service/{report}_603023.html'
-    data = pd.read_csv(url, na_values=['--', ' --', '-- '],
-                       encoding='gb2312').iloc[:, :-1]
-    return data
+    valid_types = ('report', 'year', 'season')
+    valid_parts = ('zycwzb', 'ylnl', 'chnl', 'cznl', 'yynl')
+    assert type_ in valid_types, f"有效类型 {valid_types}"
+    assert part in valid_parts, f"有效项目 {valid_parts}"
+    if part == 'zycwzb':
+        url = f'http://quotes.money.163.com/service/zycwzb_{code}.html?type={type_}'
+    else:
+        url = f'http://quotes.money.163.com/service/zycwzb_{code}.html?type={type_}&part={part}'
+    date_key = '报告日期'
+    df = pd.read_csv(url,
+                     na_values=['--', ' --', '-- '],
+                     encoding='gbk').iloc[:, :-1]
+    df.columns = [str(c).strip() for c in df.columns]
+    df.set_index(date_key, inplace=True)
+    return df.T.reset_index().rename(columns={'index': date_key})
 
 
 @friendly_download()
@@ -261,7 +259,7 @@ def fetch_financial_report(code, report_item):
     date_key = '报告日期'
     url = f'http://quotes.money.163.com/service/{report_item}_{code}.html'
     df = pd.read_csv(url, na_values=['--', ' --', '-- '],
-                     encoding='gb18030').iloc[:, :-1]
+                     encoding='gbk').iloc[:, :-1]
     df.columns = [str(c).strip() for c in df.columns]
     df.set_index(date_key, inplace=True)
     return df.T.reset_index().rename(columns={'index': date_key})
