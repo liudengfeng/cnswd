@@ -30,6 +30,11 @@ NEWS_PATTERN = re.compile(r'\W+')
 STOCK_CODE_PATTERN = re.compile(r'\d{6}')
 SORT_PAT = re.compile(r'↑|↓')
 DATA_BASE_URL = 'http://stock.finance.sina.com.cn/stock/go.php/'
+MARGIN_COL_NAMES = [
+    '股票代码', '股票简称',
+    '融资余额', '融资买入额', '融资偿还额',
+    '融券余量金额', '融券余量', '融券卖出量', '融券偿还量', '融券余额'
+]
 
 logger = logbook.Logger('新浪网')
 
@@ -459,3 +464,15 @@ def fetch_roc_prediction(pages=1, verbose=False):
     df = _common_fun(url, pages, 0, verbose=verbose)
     df['股票代码'] = df['股票代码'].str.extract(r'(?P<digit>\d{6})', expand=False)
     return df.iloc[:, :9]
+
+
+def fetch_margin(tdate):
+    """指定日期融资融券数据"""
+    tdate = "2020-09-14"
+    url = f"http://vip.stock.finance.sina.com.cn/q/go.php/vInvestConsult/kind/rzrq/index.phtml?tradedate={tdate}"
+    r = requests.get(url)
+    df = pd.read_html(r.text, skiprows=[0, 1, 2])[1]
+    df.drop(columns=[0], inplace=True)
+    df.columns = MARGIN_COL_NAMES
+    df['股票代码'] = df['股票代码'].map(lambda x: str(x).zfill(6))
+    return df

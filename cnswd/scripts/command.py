@@ -17,10 +17,12 @@ import pandas as pd
 
 from ..cninfo import ASR_KEYS
 from ..utils import kill_firefox, remove_temp_files
-from . import (classify, cninfo, cninfo_meta, disclosure, sina_news, sina_tzpj,
-               sina_quote, sw_class, tct_gn, tct_minutely, ths_gn, ths_news,
-               trading_calendar, trading_codes, treasury, wy_cjmx, wy_gszl,
-               wy_fhpg, wy_index, wy_cwbg, wy_stock, yahoo)
+from . import (
+    classify, cninfo, cninfo_meta, disclosure, sina_margin, sina_news,
+    sina_quote, sina_tzpj, sw_class, tct_gn, tct_minutely, ths_gn, ths_news,
+    trading_calendar, trading_codes, treasury, wy_cjmx, wy_cwbg, wy_fhpg,
+    wy_gszl, wy_index, wy_stock, yahoo
+)
 
 
 @click.group()
@@ -99,6 +101,12 @@ def snnews(pages):
 def sntzpj():
     """【新浪】最新股票评级"""
     sina_tzpj.refresh()
+
+
+@stock.command()
+def snrzrq():
+    """【新浪】融资融券"""
+    sina_margin.refresh()
 
 
 @stock.command()
