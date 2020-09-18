@@ -28,7 +28,8 @@ from .._exceptions import NoWebData, FrequentAccess
 QUOTE_PATTERN = re.compile('"(.*)"')
 NEWS_PATTERN = re.compile(r'\W+')
 STOCK_CODE_PATTERN = re.compile(r'\d{6}')
-DATA_BASE_URL = 'http://vip.stock.finance.sina.com.cn/q/go.php/'
+SORT_PAT = re.compile(r'↑|↓')
+DATA_BASE_URL = 'http://stock.finance.sina.com.cn/stock/go.php/'
 
 logger = logbook.Logger('新浪网')
 
@@ -184,37 +185,35 @@ def fetch_cjmx(stock_code, date_):
 
 
 @friendly_download(10, 10, 1)
-def _common_fun(url, pages, skiprows=1, verbose=False):
+def _common_fun(url, pages, header=0, verbose=False):
     """处理新浪数据中心网页数据通用函数"""
     dfs = []
 
     def sina_read_fun(x):
         return pd.read_html(
             x,
-            skiprows=skiprows,
+            header=header,
             na_values=['--'],
             flavor='html5lib',
             attrs={'class': 'list_table'})[0]
-
-    reader = DataProxy(sina_read_fun, '00:00:00')
 
     for i in range(1, pages + 1):
         page_url = url + 'p={}'.format(i)
         if verbose:
             logger.info('第{}页'.format(i))
-        df = reader.read(x=page_url)
+        df = sina_read_fun(page_url)
         dfs.append(df)
     return pd.concat(dfs, ignore_index=True)
 
 
-def fetch_rating(pages=1, verbose=False):
+def fetch_rating(page=1):
     """
     投资评级数据
 
     参数
     ----
-    pages : int
-        要抓取的页面数量，默认为1，取第一页
+    page : int
+        指定页，默认为1，取第一页
     verbose : bool
         是否显示日志信息，默认为假
 
@@ -222,15 +221,18 @@ def fetch_rating(pages=1, verbose=False):
     ----
     res ： pd.DataFrame
     """
-    if verbose:
-        logger.info('提取机构评级网页数据')
-    # 名称中可能含有非法字符，重新定义列名称
-    cols = ['股票代码', '股票名称', '目标价', '最新评级', '评级机构', '分析师', '行业', '评级日期']
-    url = DATA_BASE_URL + 'vIR_RatingNewest/index.phtml?'
-    df = _common_fun(url, pages, verbose=verbose)
+    url = DATA_BASE_URL + f'vIR_RatingNewest/index.phtml?p={page}'
+    df = pd.read_html(
+        url,
+        header=0,
+        na_values=['--'],
+        flavor='html5lib',
+        attrs={'class': 'list_table'})[0]
     df = df.iloc[:, :8]
-    df.columns = cols
+    # 去掉排序符号
+    df.columns = [SORT_PAT.sub('', col) for col in df.columns]
     df['股票代码'] = df['股票代码'].map(lambda x: str(x).zfill(6))
+    df['评级日期'] = pd.to_datetime(df['评级日期'], errors='ignore')
     return df
 
 

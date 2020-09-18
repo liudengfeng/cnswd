@@ -17,7 +17,7 @@ import pandas as pd
 
 from ..cninfo import ASR_KEYS
 from ..utils import kill_firefox, remove_temp_files
-from . import (classify, cninfo, cninfo_meta, disclosure, sina_news,
+from . import (classify, cninfo, cninfo_meta, disclosure, sina_news, sina_tzpj,
                sina_quote, sw_class, tct_gn, tct_minutely, ths_gn, ths_news,
                trading_calendar, trading_codes, treasury, wy_cjmx, wy_gszl,
                wy_fhpg, wy_index, wy_cwbg, wy_stock, yahoo)
@@ -93,6 +93,12 @@ def thsgn():
 def snnews(pages):
     """【新浪】财经消息"""
     sina_news.refresh(pages)
+
+
+@stock.command()
+def sntzpj():
+    """【新浪】最新股票评级"""
+    sina_tzpj.refresh()
 
 
 @stock.command()
