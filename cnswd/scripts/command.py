@@ -21,7 +21,7 @@ from . import (
     classify, cninfo, cninfo_meta, disclosure, sina_margin, sina_news,
     sina_quote, sina_tzpj, sw_class, tct_gn, tct_minutely, ths_gn, ths_news,
     trading_calendar, trading_codes, treasury, wy_cjmx, wy_cwbg, wy_fhpg,
-    wy_gszl, wy_index, wy_stock, wy_zycwzb, yahoo)
+    wy_gszl, wy_index, wy_stock, wy_yjyg, wy_zycwzb, yahoo)
 
 
 @click.group()
@@ -176,6 +176,12 @@ def wycwbg():
 def wyzycwzb():
     """刷新【网易】股票财务主要财务指标"""
     wy_zycwzb.refresh()
+
+
+@stock.command()
+def wyyjyg():
+    """刷新【网易】股票业绩预告"""
+    wy_yjyg.refresh()
 
 
 @stock.command()

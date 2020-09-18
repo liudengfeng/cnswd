@@ -277,30 +277,18 @@ def _parse_performance_notice(raw_df):
     return data
 
 
-def fetch_performance_notice(stock_code, output_type='list'):
-    """业绩预告
-    如果输出类型为list，则输出dict列表
-    否则，输出DataFrame对象。
-    """
-    url_fmt = 'http://quotes.money.163.com/f10/yjyg_{}.html'
-    url = url_fmt.format(stock_code)
-    response = get_page_response(url)
-    dfs = pd.read_html(response.text,
-                       match='报告日期',
-                       attrs={'class': 'table_bg001 border_box table_details'})
-    result = [_parse_performance_notice(df) for df in dfs]
-    if output_type == 'list':
-        return result
-    else:
-        df = pd.DataFrame.from_dict(result)
-        df.set_index('announcement_date', inplace=True)
-        return df
+def fetch_yjyg(stock_code):
+    """业绩预告docs【返回 list of dict】"""
+    url = f"http://quotes.money.163.com/f10/yjyg_{stock_code}.html#01c03"
+    r = requests.get(url)
+    table_css = ".inner_box table"
+    soup = BeautifulSoup(r.text, 'lxml')
+    tables = soup.select(table_css)
+    return [_table_to_dict(table.select('td')) for table in tables]
 
 
-def _table_to_dict(html, td_css):
+def _table_to_dict(tds):
     """以键值对形式存在的网页表格解析为字典"""
-    soup = BeautifulSoup(html, 'lxml')
-    tds = soup.select(td_css)
     labels = [S_PAT.sub('', e.text) for e in tds[::2]]
     values = [S_PAT.sub('', e.text) for e in tds[1::2]]
     return {k: v for k, v in zip(labels, values)}
@@ -313,8 +301,11 @@ def fetch_company_info(stock_code):
     r = requests.get(url)
     tb_1_td_css = '.col_l_01 > table:nth-child(3) td'
     tb_2_td_css = '.col_r_01 > table:nth-child(3) td'
-    tb1 = _table_to_dict(r.text, tb_1_td_css)
-    tb2 = _table_to_dict(r.text, tb_2_td_css)
+    soup = BeautifulSoup(r.text, 'lxml')
+    tds_1 = soup.select(tb_1_td_css)
+    tds_2 = soup.select(tb_2_td_css)
+    tb1 = _table_to_dict(tds_1)
+    tb2 = _table_to_dict(tds_2)
     return tb1, tb2
 
 
