@@ -26,6 +26,7 @@ def parse_info(elem):
 
 class THS(object):
     """同花顺网页信息api"""
+
     def __init__(self):
         self.logger = logger
         self.logger.info("创建无头浏览器")
@@ -79,7 +80,8 @@ class THS(object):
             target_url = target_url_fmt.format(page, gn_code)
             self.browser.get(target_url)
             df = self._read_html_data(self.browser.page_source, gn_code)
-            codes.extend(df['股票代码'].values.tolist())
+            if '暂无' not in df.iloc[0, 0]:
+                codes.extend(df['股票代码'].values.tolist())
             logger.info(
                 f"概念股票列表 {gn_name} {page:>4}/{num:>4} 行数{len(df):>4}")
         return {'概念编码': gn_code, '股票列表': codes, '概念定义': definition}
