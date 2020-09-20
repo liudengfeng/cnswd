@@ -38,10 +38,10 @@ def stock():
 
 
 # region 元数据
-@stock.command()
-def cnmeta():
-    """刷新深证信元数据"""
-    cninfo_meta.refresh()
+# @stock.command()
+# def cnmeta():
+#     """刷新深证信元数据"""
+#     cninfo_meta.refresh()
 
 
 # endregion
@@ -66,10 +66,10 @@ def codes():
     trading_codes.refresh()
 
 
-@stock.command()
-def clsf():
-    """【深证信】股票分类及BOM表"""
-    classify.refresh()
+# @stock.command()
+# def clsf():
+#     """【深证信】股票分类及BOM表"""
+#     classify.refresh()
 
 
 @stock.command()
@@ -139,11 +139,11 @@ def quote():
     asyncio.run(sina_quote.refresh())
 
 
-@stock.command()
-def margin():
-    """刷新【深证信】融资融券"""
-    # before_refresh()
-    cninfo.refresh_margin()
+# @stock.command()
+# def margin():
+#     """刷新【深证信】融资融券"""
+#     # before_refresh()
+#     cninfo.refresh_margin()
 
 
 @stock.command()
@@ -208,20 +208,20 @@ def tctm():
 
 
 # region 财报及指标
-@stock.command()
-@click.option(
-    '--items',
-    required=False,
-    multiple=True,
-    default=ASR_KEYS,
-    type=click.Choice(ASR_KEYS, case_sensitive=False),
-    help='深证信高级搜索项目数据。指定多项目 stock asr --items=基本资料 --items=个股报告期利润表 \n 全部项目 stock asr',
-)
-def asr(items):
-    """刷新【深证信】数据浏览项目数据"""
-    # before_refresh()
-    # click.echo(items)
-    cninfo.refresh_asr(items)
+# @stock.command()
+# @click.option(
+#     '--items',
+#     required=False,
+#     multiple=True,
+#     default=ASR_KEYS,
+#     type=click.Choice(ASR_KEYS, case_sensitive=False),
+#     help='深证信高级搜索项目数据。指定多项目 stock asr --items=基本资料 --items=个股报告期利润表 \n 全部项目 stock asr',
+# )
+# def asr(items):
+#     """刷新【深证信】数据浏览项目数据"""
+#     # before_refresh()
+#     # click.echo(items)
+#     cninfo.refresh_asr(items)
 
 
 @stock.command()
