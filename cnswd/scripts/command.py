@@ -66,10 +66,10 @@ def codes():
     trading_codes.refresh()
 
 
-# @stock.command()
-# def clsf():
-#     """【深证信】股票分类及BOM表"""
-#     classify.refresh()
+@stock.command()
+def clsf():
+    """【深证信】股票分类及BOM表"""
+    classify.refresh()
 
 
 @stock.command()
