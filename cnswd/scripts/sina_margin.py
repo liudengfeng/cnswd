@@ -20,7 +20,7 @@ DATES = pd.date_range(START, pd.Timestamp('today') -
 def create_index_for(collection):
     # 不存在索性信息时，创建索引
     if not collection.index_information():
-        collection.create_index([(DATE_KEY, -1), ("股票代码", 1)])
+        collection.create_index([(DATE_KEY, -1), ("股票代码", 1)], unique=True)
 
 
 def need_refresh(collection):
@@ -48,7 +48,7 @@ def get_max_dt(collection):
 def _droped_null(doc):
     res = {}
     for k, v in doc.items():
-        if not pd.isnull(doc[k]):
+        if doc[k] != '--':
             res[k] = v
     return res
 
