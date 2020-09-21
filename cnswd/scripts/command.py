@@ -18,10 +18,10 @@ import pandas as pd
 from ..cninfo import ASR_KEYS
 from ..utils import kill_firefox, remove_temp_files
 from . import (
-    classify, cninfo, cninfo_meta, disclosure, sina_margin, sina_news,
-    sina_quote, sina_tzpj, sw_class, tct_gn, tct_minutely, ths_gn, ths_news,
-    trading_calendar, trading_codes, treasury, wy_cjmx, wy_cwbg, wy_fhpg,
-    wy_gszl, wy_index, wy_stock, wy_yjyg, wy_zycwzb, yahoo)
+    classify, cninfo, cninfo_meta, cninfo_yypl, disclosure, sina_margin,
+    sina_news, sina_quote, sina_tzpj, sw_class, tct_gn, tct_minutely, ths_gn,
+    ths_news, trading_calendar, trading_codes, treasury, wy_cjmx, wy_cwbg,
+    wy_fhpg, wy_gszl, wy_index, wy_stock, wy_yjyg, wy_zycwzb, yahoo)
 
 
 @click.group()
@@ -37,11 +37,10 @@ def stock():
     pass
 
 
-# region 元数据
-# @stock.command()
-# def cnmeta():
-#     """刷新深证信元数据"""
-#     cninfo_meta.refresh()
+@stock.command()
+def yypl():
+    """【巨潮】财报预约披露日期"""
+    cninfo_yypl.refresh()
 
 
 # endregion

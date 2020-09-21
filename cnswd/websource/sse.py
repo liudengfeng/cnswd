@@ -26,7 +26,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
 from cnswd.utils import data_root, most_recent_path
-from cnswd.websource._seleniumwire import make_headless_browser
+from cnswd._seleniumwire import make_headless_browser
 
 
 logger = logbook.Logger('上交所')
