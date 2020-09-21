@@ -242,7 +242,6 @@ def fetch_financial_indicator(code, type_, part):
     df.set_index(date_key, inplace=True)
     return df.T.reset_index().rename(columns={'index': date_key})
 
-
 @friendly_download()
 def fetch_financial_report(code, report_item):
     """
@@ -260,11 +259,13 @@ def fetch_financial_report(code, report_item):
     url = f'http://quotes.money.163.com/service/{report_item}_{code}.html'
     df = pd.read_csv(url, na_values=['--', ' --', '-- '],
                      encoding='gbk').iloc[:, :-1]
-    df.set_index(date_key, inplace=True)
-    df = df.T.reset_index().rename(columns={'index': date_key})
+    columns = df.iloc[:, 0].values
+    data = df.iloc[:, 1:].T
     # 转换后，科目为列名称
-    df.columns = [str(c).strip() for c in df.columns]
-    return df
+    data.columns = [str(c).strip() for c in columns]
+    # 修改索引名称
+    data.index.name = date_key
+    return data.reset_index()
 
 
 def _parse_performance_notice(raw_df):

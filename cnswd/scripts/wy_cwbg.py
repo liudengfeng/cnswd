@@ -19,6 +19,7 @@ from .base import get_stock_status
 logger = make_logger('网易财务分析')
 
 NAMES = {'zcfzb': '资产负债表', 'lrb': '利润表', 'xjllb': '现金流量表'}
+# NAMES = {'xjllb': '现金流量表'}  # 删除
 START = MARKET_START.tz_localize(None)
 DATE_KEY = '报告日期'
 
@@ -95,7 +96,8 @@ def _refresh(batch, d):
             try:
                 # 此处下载股票全部历史数据
                 df = fetch_financial_report(code, key)
-            except (ValueError, KeyError):
+            except (ValueError, KeyError, IndexError) as e:
+                logger.error(f"股票 {code} {name:>7} 可忽略异常 {e}")
                 # 网页不存在时发生，忽略
                 # 标注为完成状态
                 d[(code, key)] = True
@@ -130,14 +132,14 @@ def refresh():
         for k in product(codes, NAMES.keys()):
             d[k] = False
         func = partial(_refresh, d=d)
-        for _ in range(10):
-            try:
-                with Pool(MAX_WORKER) as pool:
-                    r = pool.map_async(func, batches)
-                    r.wait()
-            except Exception as e:
-                logger.error(f"{e}")
-                time.sleep(30)
+        for i in range(10):
+            if all(d.values()):
+                break
+            logger.info(f"第{i+1}次尝试")
+            # 异步导致失败
+            with Pool(MAX_WORKER) as pool:
+                pool.map(func, batches)
+            time.sleep(30)
         failed = valfilter(lambda x: x == False, d)
         logger.warning(f"失败数量：{len(failed)}")
     logger.info(f"股票数量 {len(codes)}, 用时 {time.time() - t:.2f}秒")
