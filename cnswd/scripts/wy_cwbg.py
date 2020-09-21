@@ -26,9 +26,7 @@ DATE_KEY = '报告日期'
 def create_index_for(collection):
     # 不存在索性信息时，创建索引
     if not collection.index_information():
-        # collection.create_index([("公告日期", 1)])
-        # collection.create_index([("股票代码", 1)])
-        collection.create_index([(DATE_KEY, 1), ("股票代码", 1)])
+        collection.create_index([(DATE_KEY, 1), ("股票代码", 1)], unique=True)
 
 
 def need_refresh(collection, code):
@@ -76,7 +74,7 @@ def get_max_dt(collection, code):
 def _droped_null(doc):
     res = {}
     for k, v in doc.items():
-        if not pd.isnull(doc[k]):
+        if pd.notnull(doc[k]) and doc[k] != '--':
             res[k] = v
     return res
 
@@ -85,6 +83,7 @@ def _refresh(batch, d):
     db = get_db('wy')
     for key, name in NAMES.items():
         collection = db[name]
+        create_index_for(collection)
         for code in batch:
             # 首先检查状态，减少数据库查询
             if d.get((code, key), False):
@@ -94,6 +93,7 @@ def _refresh(batch, d):
                 logger.info(f"股票 {code} {name:>7} 已经刷新")
                 continue
             try:
+                # 此处下载股票全部历史数据
                 df = fetch_financial_report(code, key)
             except (ValueError, KeyError):
                 # 网页不存在时发生，忽略
@@ -106,8 +106,8 @@ def _refresh(batch, d):
             # 正常情形下运行以下代码
             df['股票代码'] = code
             df[DATE_KEY] = pd.to_datetime(df[DATE_KEY], errors='ignore')
-            create_index_for(collection)
             last_dt = get_max_dt(collection, code)
+            # 只有新增数据才需要添加
             df = df[df[DATE_KEY] > last_dt]
             if not df.empty:
                 for doc in df.to_dict('records'):
@@ -139,5 +139,4 @@ def refresh():
                 time.sleep(30)
         failed = valfilter(lambda x: x == False, d)
         logger.warning(f"失败数量：{len(failed)}")
-        # print(f"失败项目 {failed} ")
     logger.info(f"股票数量 {len(codes)}, 用时 {time.time() - t:.2f}秒")

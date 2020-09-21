@@ -260,9 +260,11 @@ def fetch_financial_report(code, report_item):
     url = f'http://quotes.money.163.com/service/{report_item}_{code}.html'
     df = pd.read_csv(url, na_values=['--', ' --', '-- '],
                      encoding='gbk').iloc[:, :-1]
-    df.columns = [str(c).strip() for c in df.columns]
     df.set_index(date_key, inplace=True)
-    return df.T.reset_index().rename(columns={'index': date_key})
+    df = df.T.reset_index().rename(columns={'index': date_key})
+    # 转换后，科目为列名称
+    df.columns = [str(c).strip() for c in df.columns]
+    return df
 
 
 def _parse_performance_notice(raw_df):
