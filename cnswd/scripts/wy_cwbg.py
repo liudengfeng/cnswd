@@ -123,7 +123,7 @@ def refresh():
     shuffle(codes)
     # 约4000只股票，每批300只
     batches = partition_all(300, codes)
-
+    logger.info(f"股票数量 {len(codes)}")
     # 多进程
     with Manager() as manager:
         d = manager.dict()
@@ -133,7 +133,8 @@ def refresh():
         for _ in range(10):
             try:
                 with Pool(MAX_WORKER) as pool:
-                    list(pool.imap_unordered(func, batches))
+                    r = pool.map_async(func, batches)
+                    r.wait()
             except Exception as e:
                 logger.error(f"{e}")
                 time.sleep(30)
