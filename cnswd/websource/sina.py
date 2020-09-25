@@ -18,6 +18,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 import logbook
+from toolz.itertoolz import partition_all
 
 from ..setting.constants import QUOTE_COLS
 from cnswd.utils import ensure_list
@@ -34,6 +35,9 @@ MARGIN_COL_NAMES = [
     '股票代码', '股票简称',
     '融资余额', '融资买入额', '融资偿还额',
     '融券余量金额', '融券余量', '融券卖出量', '融券偿还量', '融券余额'
+]
+INDEX_QUOTE_COLS = [
+    '指数简称', '最新价', '涨跌', '涨跌幅%', '成交量(万手)', '成交额(万元)'
 ]
 
 logger = logbook.Logger('新浪网')
@@ -101,15 +105,68 @@ def fetch_quotes(stock_codes):
     stock_codes = ensure_list(stock_codes)
     num = len(stock_codes)
     length = 800
-    times = int(num / length) + 1
     url_fmt = 'http://hq.sinajs.cn/list={}'
     dfs = []
-    for i in range(times):
-        p_codes = stock_codes[i * length:(i + 1) * length]
+    for p_codes in partition_all(length, stock_codes):
+        # p_codes = stock_codes[i * length:(i + 1) * length]
         url = url_fmt.format(','.join(map(_add_prefix, p_codes)))
         content = get_page_response(url).text
         dfs.append(_to_dataframe(content, p_codes))
     return pd.concat(dfs).sort_values('股票代码')
+
+
+def _add_index_prefix(code):
+    pre = code[0]
+    if pre == '0':
+        return 's_sh{}'.format(code)
+    else:
+        return 's_sz{}'.format(code)
+
+
+def _to_index_dataframe(content, p_codes):
+    """解析网页数据，返回DataFrame对象"""
+    res = [x.split(',') for x in re.findall(QUOTE_PATTERN, content)]
+    df = pd.DataFrame(res)
+    df.columns = INDEX_QUOTE_COLS
+    df.insert(0, '指数代码', p_codes)
+    df['成交时间'] = pd.Timestamp.now().round('s')
+    df.dropna(inplace=True)
+    return df
+
+
+def fetch_index_quotes(codes):
+    """
+    获取指数列表的分时报价
+
+    Parameters
+    ----------
+    codes : list
+        代码列表
+
+    Returns
+    -------
+    res : DataFrame
+        行数 = len(stock_codes)   
+        33列   
+
+    Example
+    -------
+    >>> df = fetch_index_quotes(['000001','000002'])
+    >>> df.iloc[:,:8] 
+        股票代码  股票简称      开盘     前收盘      现价      最高      最低     竞买价
+    0  000001  平安银行  11.040  11.050  10.900  11.050  10.880  10.900
+    1  000002  万 科Ａ  33.700  34.160  33.290  33.990  33.170  33.290
+    """
+    codes = ensure_list(codes)
+    length = 800
+    url_fmt = 'http://hq.sinajs.cn/list={}'
+    dfs = []
+    for p_codes in partition_all(length, codes):
+        url = url_fmt.format(','.join(map(_add_index_prefix, p_codes)))
+        content = get_page_response(url).text
+        dfs.append(_to_index_dataframe(content, p_codes))
+    return pd.concat(dfs).sort_values('指数代码')
+
 
 # 不可用
 
