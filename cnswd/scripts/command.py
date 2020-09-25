@@ -17,11 +17,12 @@ import pandas as pd
 
 from ..cninfo import ASR_KEYS
 from ..utils import kill_firefox, remove_temp_files
-from . import (
-    classify, cninfo, cninfo_meta, cninfo_yypl, disclosure, sina_margin,
-    sina_news, sina_quote, sina_tzpj, sw_class, tct_gn, tct_minutely, ths_gn,
-    ths_news, trading_calendar, trading_codes, treasury, wy_cjmx, wy_cwbg,
-    wy_fhpg, wy_gszl, wy_index, wy_stock, wy_yjyg, wy_zycwzb, yahoo)
+from . import (classify, cninfo, cninfo_meta, cninfo_yypl, disclosure,
+               index_codes, sina_margin, sina_news, sina_quote,
+               sina_quote_index, sina_tzpj, sw_class, tct_gn, tct_minutely,
+               ths_gn, ths_news, trading_calendar, trading_codes, treasury,
+               wy_cjmx, wy_cwbg, wy_fhpg, wy_gszl, wy_index, wy_stock, wy_yjyg,
+               wy_zycwzb, yahoo)
 
 
 @click.group()
@@ -63,6 +64,12 @@ def cld():
 def codes():
     """股票代码列表"""
     trading_codes.refresh()
+
+
+@stock.command()
+def icodes():
+    """指数代码列表"""
+    index_codes.refresh()
 
 
 @stock.command()
@@ -136,6 +143,12 @@ def dscl(init):
 def quote():
     """【新浪】股票实时报价"""
     asyncio.run(sina_quote.refresh())
+
+
+@stock.command()
+def iquote():
+    """【新浪】指数实时报价"""
+    asyncio.run(sina_quote_index.refresh())
 
 
 # @stock.command()
