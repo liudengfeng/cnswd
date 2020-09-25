@@ -131,4 +131,5 @@ def refresh_last_5():
     """刷新最近5天成交明细"""
     tdates = [pd.Timestamp(d) for d in _last_5()]
     with Pool(MAX_WORKER) as pool:
-        pool.map(refresh, tdates)
+        r = pool.map_async(refresh, tdates)
+        r.wait()
