@@ -129,7 +129,7 @@ def _to_index_dataframe(content, p_codes):
     df = pd.DataFrame(res)
     df.columns = INDEX_QUOTE_COLS
     df.insert(0, '指数代码', p_codes)
-    df['成交时间'] = pd.Timestamp.now().round('s')
+    df['成交时间'] = pd.Timestamp.now().round('T')
     df.dropna(inplace=True)
     return df
 

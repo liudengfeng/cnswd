@@ -35,7 +35,7 @@ def _to_dataframe(content):
     res = [x.split(',') for x in re.findall(QUOTE_PATTERN, content)]
     df = pd.DataFrame(res)
     df.columns = INDEX_QUOTE_COLS
-    df['时间'] = pd.Timestamp.now().round('T')
+    df['时间'] = pd.Timestamp.now().floor('T')
     df.dropna(inplace=True)
     return df
 

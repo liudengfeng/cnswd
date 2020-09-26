@@ -76,7 +76,7 @@ class HotDataCache(object):
         last = self.last_refresh_time
         next_time = last + pd.Timedelta(self.delta)
         next_time = pd.Timestamp(next_time)
-        next_time = next_time.round('min')
+        next_time = next_time.floor('T')
         return next_time.replace(hour=self.hour, minute=self.minute)
 
     @ property

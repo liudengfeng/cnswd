@@ -15,10 +15,10 @@ def get_delist_stock_dates():
     res = {}
     for c, d in zip(sz_delist_df['证券代码'].values, sz_delist_df['终止上市日期'].values):
         if not pd.isnull(d):
-            res[c] = pd.to_datetime(d).round('D')
+            res[c] = pd.to_datetime(d).floor('D')
     for c, d in zip(sh_delist_df['COMPANY_CODE'].values, sh_delist_df['QIANYI_DATE'].values):
         if not pd.isnull(d):
-            res[c] = pd.to_datetime(d).round('D')
+            res[c] = pd.to_datetime(d).floor('D')
     return res
 
 

@@ -21,8 +21,8 @@ from . import (classify, cninfo, cninfo_meta, cninfo_yypl, disclosure,
                index_codes, sina_margin, sina_news, sina_quote,
                sina_quote_index, sina_tzpj, sw_class, tct_gn, tct_minutely,
                ths_gn, ths_news, trading_calendar, trading_codes, treasury,
-               wy_cjmx, wy_cwbg, wy_fhpg, wy_gszl, wy_index, wy_stock, wy_yjyg,
-               wy_zycwzb, yahoo)
+               wy_cjmx, wy_cwbg, wy_fhpg, wy_gszl, wy_index, wy_quote,
+               wy_quote_index, wy_stock, wy_yjyg, wy_zycwzb, yahoo)
 
 
 @click.group()
@@ -137,6 +137,18 @@ def dscl(init):
 # endregion
 
 # region 交易数据
+
+
+@stock.command()
+def wyquote():
+    """【网易】股票实时报价"""
+    wy_quote.refresh()
+
+
+@stock.command()
+def wyiquote():
+    """【网易】股票指数实时报价"""
+    wy_quote_index.refresh()
 
 
 @stock.command()

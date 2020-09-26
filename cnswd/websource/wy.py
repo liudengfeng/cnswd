@@ -13,22 +13,25 @@
     融资融券               fetch_margin_data
 
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
-from urllib.error import HTTPError
-from bs4 import BeautifulSoup
-import requests
-import pandas as pd
+import json
 import re
-from functools import partial, lru_cache
-from io import StringIO, BytesIO
+from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache, partial
+from io import BytesIO, StringIO
+from urllib.error import HTTPError
 
-from ..utils import sanitize_dates
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+from cnswd.utils.tools import ensure_list
+from toolz.itertoolz import partition_all, concat
 
-from .base import get_page_response, friendly_download
 from .._exceptions import NoWebData
+from ..setting.constants import MAX_WORKER
+from ..utils import sanitize_dates
+from .base import friendly_download, get_page_response
 
 _WY_STOCK_HISTORY_NAMES = [
     'name', 'close', 'high', 'low', 'open', 'prev_close', 'change',
@@ -55,6 +58,7 @@ _WY_FH_COLS = [
 ]
 S_PAT = re.compile(r"\s")
 MARGIN_START = pd.Timestamp('2010-3-31').date()
+QUOTE_PAT = re.compile(".*?\((.*)\)")
 
 
 def get_index_base():
@@ -108,6 +112,39 @@ def _query_code(code, is_index):
         else:
             code = '1{}'.format(code)
     return code
+
+
+def _to_code(d):
+    """7位->6位代码"""
+    d['code'] = d['code'][1:]
+    return d
+
+
+def _fetch_quote(url):
+    r = requests.get(url)
+    docs = json.loads(QUOTE_PAT.match(r.text).groups(1)[0]).values()
+    return [_to_code(doc) for doc in docs]
+
+
+def fetch_quote(codes, is_index=False, n=800):
+    """股票代码或指数列表报价.
+
+    Args:
+        codes (list-like): 代码列表
+        is_index (bool, optional): 是否为指数代码. Defaults to False.
+        n (int, optional): 每批请求代码数量. Defaults to 800.
+
+    Returns:
+        list of dictionary: 报价列表字典
+    """
+    url_fmt = 'http://api.money.126.net/data/feed/{}'
+    codes = ensure_list(codes)
+    b_codes = partition_all(n, codes)
+    urls = [url_fmt.format(','.join([_query_code(code, is_index)
+                                     for code in batch])) for batch in b_codes]
+    with ThreadPoolExecutor(MAX_WORKER) as excutor:
+        docs = excutor.map(_fetch_quote, urls)
+        return concat(docs)
 
 
 def fetch_history(code, start, end=None, is_index=False):
@@ -241,6 +278,7 @@ def fetch_financial_indicator(code, type_, part):
     df.columns = [str(c).strip() for c in df.columns]
     df.set_index(date_key, inplace=True)
     return df.T.reset_index().rename(columns={'index': date_key})
+
 
 @friendly_download()
 def fetch_financial_report(code, report_item):
