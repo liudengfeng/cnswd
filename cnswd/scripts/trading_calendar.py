@@ -9,7 +9,7 @@ bug：网易指数数据并不能确保及时更新
 解决方案：
     存储最近的交易日合并
 
-工作日每天 9：31分执行
+工作日每天 9:16 执行
 """
 import re
 
@@ -21,7 +21,7 @@ from ..mongodb import get_db
 from ..setting.constants import MARKET_START
 from ..utils import data_root, ensure_dt_localize, make_logger
 from ..websource.tencent import get_recent_trading_stocks
-from ..websource.wy import fetch_history
+from ..websource.wy import fetch_history, fetch_quote
 from .trading_codes import read_all_stock_codes
 
 DATE_PATTERN = re.compile(r'(\d{4}-\d{2}-\d{2})')
@@ -39,11 +39,9 @@ def _add_prefix(stock_code):
 def _is_today_trading(codes):
     """只有实际成交后才会体现当天为交易日"""
     today = pd.Timestamp.today()
-    url_fmt = 'http://hq.sinajs.cn/list={}'
-    url = url_fmt.format(','.join(map(_add_prefix, codes)))
-    r = requests.get(url)
-    dts = re.findall(DATE_PATTERN, r.text)
-    return today.strftime(r"%Y-%m-%d") in dts
+    quotes = fetch_quote(codes)
+    dts = [doc['time'][:10] for doc in quotes]
+    return today.strftime(r"%Y/%m/%d") in dts
 
 
 def update(tdates, last_month):
