@@ -25,4 +25,4 @@ log4mongo>=1.7.0
 tqdm>=4.47.0
 akshare>=0.6.34
 toolz>=0.10.0
--e git://github.com/liudengfeng/yahooquery#egg=yahooquery
+https://github.com/liudengfeng/yahooquery/archive/2.2.5.tar.gz
