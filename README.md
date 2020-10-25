@@ -47,11 +47,10 @@
 + `pip install https://github.com/liudengfeng/yahooquery/archive/2.2.4.tar.gz`
 ### 安装
 ```cmd
-pip install -r req_dev.txt
-pip install .
+pip install -r req_dev.txt .
 
 # 开发模式
-pip install -e .
+pip install -r req_dev.txt -e .
 
 # 有关存储路径设置，请修改`setting/config.py/DEFAULT_CONFIG`，然后安装
 ```
