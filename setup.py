@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="cnswd",
-    version="5.0.0",
+    version="5.0.1",
     packages=find_packages(),
     long_description="""
     股票网络数据工具包
