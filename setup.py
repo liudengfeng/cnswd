@@ -11,8 +11,8 @@ setup(
     tests_require=["pytest", "parameterized"],
     include_package_data=True,
     entry_points={
-        'console_scripts': [
-            'stock = cnswd.scripts.command:stock',
+        "console_scripts": [
+            "stock = cnswd.scripts.command:stock",
         ],
     },
     author="LDF",
